@@ -1,6 +1,6 @@
-# Providers
+# Sources
 
-Findings from probing each provider with a real student account (UAM, Faculty of Mathematics and Computer Science), October 2026.
+Findings from probing each source with a real student account (UAM, Faculty of Mathematics and Computer Science), October 2026.
 
 ## USOS
 
