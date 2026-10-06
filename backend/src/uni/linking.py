@@ -51,14 +51,14 @@ class Linker:
                 return LinkStart(kind, client.authorize_url(request_token))
             case SourceKind.MOODLE:
                 passport = new_passport()
-                await self._pending(user, kind, passport, {"passport": passport})
+                await self._pending(user, kind, "", {"passport": passport})
                 await self.db.commit()
                 return LinkStart(
                     kind, launch_url(self.settings.moodle_base_url, passport, self.settings.app_scheme)
                 )
             case SourceKind.TEAMS:
                 login = await start_device_login(self.registry.http)
-                await self._pending(user, kind, login.device_code, {"device_code": login.device_code})
+                await self._pending(user, kind, "", {"device_code": login.device_code})
                 await self.db.commit()
                 return LinkStart(kind, login.verification_uri, login.user_code)
 
