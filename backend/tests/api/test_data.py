@@ -1,0 +1,82 @@
+import uuid
+
+import pytest
+from sqlalchemy import select
+
+from uni.domain import Assignment, SourceKind
+from uni.models import SourceLink, User
+from uni.sources.base import CredentialsExpired, SourceError
+
+
+class FakeSource:
+    def __init__(self, kind: SourceKind, outcome):
+        self.kind = kind
+        self.outcome = outcome
+        self.calls = 0
+
+    async def assignments(self) -> list[Assignment]:
+        self.calls += 1
+        if isinstance(self.outcome, Exception):
+            raise self.outcome
+        return self.outcome
+
+
+def assignment(kind: SourceKind, title: str) -> Assignment:
+    return Assignment(source=kind, id=title, course_id="c", course_name="Course", title=title)
+
+
+@pytest.fixture
+async def linked(app, signed_in):
+    async with app.state.database.sessions() as session:
+        user = await session.scalar(select(User))
+        for kind in (SourceKind.MOODLE, SourceKind.TEAMS):
+            session.add(
+                SourceLink(
+                    id=uuid.uuid4(), user_id=user.id, kind=kind, credentials=app.state.registry.seal({})
+                )
+            )
+        await session.commit()
+    sources: dict[str, FakeSource] = {}
+    app.state.registry.build = lambda link: sources[link.kind]
+    return sources
+
+
+async def test_results_are_cached_until_refresh(signed_in, linked):
+    linked["moodle"] = FakeSource(SourceKind.MOODLE, [assignment(SourceKind.MOODLE, "Lab")])
+    linked["teams"] = FakeSource(SourceKind.TEAMS, [assignment(SourceKind.TEAMS, "Essay")])
+
+    first = await signed_in.get("/assignments")
+    second = await signed_in.get("/assignments")
+    refreshed = await signed_in.get("/assignments", params={"refresh": True})
+
+    assert sorted(item["title"] for item in first.json()["items"]) == ["Essay", "Lab"]
+    assert second.json()["items"] == first.json()["items"]
+    assert linked["moodle"].calls == 2
+    assert refreshed.status_code == 200
+
+
+async def test_failing_source_keeps_last_snapshot(signed_in, linked):
+    linked["moodle"] = FakeSource(SourceKind.MOODLE, [assignment(SourceKind.MOODLE, "Lab")])
+    linked["teams"] = FakeSource(SourceKind.TEAMS, [])
+    await signed_in.get("/assignments")
+    linked["moodle"].outcome = SourceError("down")
+
+    response = await signed_in.get("/assignments", params={"refresh": True})
+
+    states = {state["kind"]: state for state in response.json()["sources"]}
+    assert [item["title"] for item in response.json()["items"]] == ["Lab"]
+    assert states["moodle"]["error"] == "source unavailable"
+    assert states["moodle"]["fetched_at"] is not None
+
+
+async def test_expired_credentials_mark_the_link(signed_in, linked, app):
+    linked["moodle"] = FakeSource(SourceKind.MOODLE, CredentialsExpired("token"))
+    linked["teams"] = FakeSource(SourceKind.TEAMS, [])
+
+    response = await signed_in.get("/assignments")
+    sources = {item["kind"]: item for item in (await signed_in.get("/sources")).json()}
+
+    assert {state["kind"]: state["error"] for state in response.json()["sources"]}[
+        "moodle"
+    ] == "credentials expired"
+    assert sources["moodle"]["expired"] is True
