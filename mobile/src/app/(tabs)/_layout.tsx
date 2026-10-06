@@ -1,16 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Tabs } from 'expo-router';
+import { Link, Tabs } from 'expo-router';
 import type { ComponentProps } from 'react';
-import type { ColorValue } from 'react-native';
+import { type ColorValue, Pressable } from 'react-native';
 
 import { colors } from '@/theme';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
 function tabIcon(name: IconName) {
-  return ({ color, size }: { color: ColorValue; size: number }) => (
-    <Ionicons name={name} size={size} color={color} />
-  );
+  return function TabIcon({ color, size }: { color: ColorValue; size: number }) {
+    return <Ionicons name={name} size={size} color={color} />;
+  };
 }
 
 function tabOptions(title: string, icon: IconName) {
@@ -26,6 +26,13 @@ export default function TabLayout() {
         tabBarStyle: { borderTopColor: colors.border },
         headerShadowVisible: false,
         headerTitleStyle: { color: colors.text },
+        headerRight: () => (
+          <Link href="/sources" asChild>
+            <Pressable accessibilityLabel="Sources" hitSlop={12} style={{ marginRight: 16 }}>
+              <Ionicons name="person-circle-outline" size={26} color={colors.text} />
+            </Pressable>
+          </Link>
+        ),
       }}
     >
       <Tabs.Screen name="index" options={tabOptions('Schedule', 'calendar-outline')} />

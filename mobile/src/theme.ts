@@ -5,6 +5,9 @@ export const colors = {
   muted: '#8A8A8E',
   accent: '#111111',
   border: '#E5E5EA',
+  danger: '#C62828',
+  warning: '#8D6E00',
+  success: '#2E7D32',
 };
 
 export const spacing = {
@@ -14,3 +17,22 @@ export const spacing = {
   lg: 24,
   xl: 32,
 };
+
+export const text = {
+  title: { fontSize: 17, fontWeight: '600' as const, color: colors.text },
+  body: { fontSize: 15, color: colors.text },
+  caption: { fontSize: 13, color: colors.muted },
+  section: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: colors.muted,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+  },
+};
+
+export const sourceNames = {
+  usos: 'USOS',
+  moodle: 'Moodle',
+  teams: 'Teams',
+} as const;
