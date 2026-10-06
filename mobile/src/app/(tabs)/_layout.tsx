@@ -13,6 +13,10 @@ function tabIcon(name: IconName) {
   );
 }
 
+function tabOptions(title: string, icon: IconName) {
+  return { title, tabBarAccessibilityLabel: title, tabBarIcon: tabIcon(icon) };
+}
+
 export default function TabLayout() {
   return (
     <Tabs
@@ -24,10 +28,10 @@ export default function TabLayout() {
         headerTitleStyle: { color: colors.text },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Schedule', tabBarIcon: tabIcon('calendar-outline') }} />
-      <Tabs.Screen name="assignments" options={{ title: 'Assignments', tabBarIcon: tabIcon('checkbox-outline') }} />
-      <Tabs.Screen name="courses" options={{ title: 'Courses', tabBarIcon: tabIcon('book-outline') }} />
-      <Tabs.Screen name="grades" options={{ title: 'Grades', tabBarIcon: tabIcon('stats-chart-outline') }} />
+      <Tabs.Screen name="index" options={tabOptions('Schedule', 'calendar-outline')} />
+      <Tabs.Screen name="assignments" options={tabOptions('Assignments', 'checkbox-outline')} />
+      <Tabs.Screen name="courses" options={tabOptions('Courses', 'book-outline')} />
+      <Tabs.Screen name="grades" options={tabOptions('Grades', 'stats-chart-outline')} />
     </Tabs>
   );
 }
