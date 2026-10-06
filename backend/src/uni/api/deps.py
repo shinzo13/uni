@@ -60,8 +60,12 @@ def get_linker(db: Db, registry: Registry) -> Linker:
     return Linker(db, registry)
 
 
-def get_aggregator(db: Db, registry: Registry, user: CurrentUser, settings: Config) -> Aggregator:
-    return Aggregator(db, registry, user, timedelta(minutes=settings.cache_minutes))
+def get_aggregator(
+    request: Request, db: Db, registry: Registry, user: CurrentUser, settings: Config
+) -> Aggregator:
+    return Aggregator(
+        db, registry, request.app.state.revalidator, user, timedelta(minutes=settings.cache_minutes)
+    )
 
 
 LinkerDep = Annotated[Linker, Depends(get_linker)]

@@ -80,3 +80,18 @@ async def test_expired_credentials_mark_the_link(signed_in, linked, app):
         "moodle"
     ] == "credentials expired"
     assert sources["moodle"]["expired"] is True
+
+
+async def test_stale_snapshot_is_served_and_revalidated(signed_in, linked, app):
+    app.state.settings.cache_minutes = 0
+    linked["moodle"] = FakeSource(SourceKind.MOODLE, [assignment(SourceKind.MOODLE, "Old")])
+    linked["teams"] = FakeSource(SourceKind.TEAMS, [])
+    await signed_in.get("/assignments")
+    linked["moodle"].outcome = [assignment(SourceKind.MOODLE, "New")]
+
+    stale = await signed_in.get("/assignments")
+    await app.state.revalidator.wait()
+    revalidated = await signed_in.get("/assignments")
+
+    assert [item["title"] for item in stale.json()["items"]] == ["Old"]
+    assert [item["title"] for item in revalidated.json()["items"]] == ["New"]

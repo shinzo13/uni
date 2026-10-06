@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI
 
+from uni.aggregator import Revalidator
 from uni.api.routes import auth, data, files, sources
 from uni.config import Settings, settings
 from uni.crypto import SecretBox
@@ -20,7 +21,9 @@ def create_app(config: Settings | None = None) -> FastAPI:
             app.state.settings = config
             app.state.database = database
             app.state.registry = SourceRegistry(config, SecretBox(config.secret_key), database.sessions, http)
+            app.state.revalidator = Revalidator(app.state.registry)
             yield
+            await app.state.revalidator.wait()
         await database.dispose()
 
     app = FastAPI(title="uni", lifespan=lifespan)
