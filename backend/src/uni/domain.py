@@ -69,12 +69,18 @@ class AssignmentStatus(StrEnum):
     UNKNOWN = "unknown"
 
 
+class AssignmentKind(StrEnum):
+    ASSIGNMENT = "assignment"
+    QUIZ = "quiz"
+
+
 class Assignment(Model):
     source: SourceKind
     id: str
     course_id: str
     course_name: str
     title: str
+    kind: AssignmentKind = AssignmentKind.ASSIGNMENT
     description_html: str = ""
     opens_at: datetime | None = None
     due_at: datetime | None = None
