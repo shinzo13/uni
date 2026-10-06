@@ -33,3 +33,21 @@ App tabs:
 - Commits: one-line Conventional Commits, lowercase (`feat(backend): ...`), no body, authored by the user, no Co-Authored-By trailer.
 - After each module, give the user a short summary: the implementation approach and which classes exist and why.
 - Never commit credentials, tokens, or personal feed URLs.
+
+## Development
+
+Backend (`backend/`, Python 3.13, uv, FastAPI, SQLAlchemy async, PostgreSQL):
+
+    docker compose -p uni up -d db          # postgres on 127.0.0.1:5433
+    uv run alembic upgrade head
+    uv run uvicorn uni.api.app:create_app --factory --reload
+    uv run pytest && uv run ruff check . && uv run ruff format --check .
+
+Settings come from `backend/.env` with the `UNI_` prefix (see `.env.example`). Layers: `sources/` (adapters, one package per source) → `aggregator.py` (snapshot cache, stale-while-revalidate) → `api/routes/`. Source credentials are encrypted with `UNI_SECRET_KEY`.
+
+Mobile (`mobile/`, Expo SDK 57, expo-router, TanStack Query):
+
+    npm ci && npx expo start
+    npm run typecheck && npm run lint
+
+`EXPO_PUBLIC_API_URL` in `mobile/.env` points the app at the backend. Linking sources redirects to the `uni://` scheme, so it needs a development build, not Expo Go.
