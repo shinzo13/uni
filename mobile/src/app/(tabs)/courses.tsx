@@ -9,7 +9,7 @@ import { Loading } from '@/components/Loading';
 import { Row, SectionHeader } from '@/components/Row';
 import { Segmented } from '@/components/Segmented';
 import { SourceIssues } from '@/components/SourceIssues';
-import { currentTerm } from '@/format';
+import { currentTerm, termLabel, termOf } from '@/format';
 import { colors, sourceNames } from '@/theme';
 
 type Scope = 'current' | 'all';
@@ -51,7 +51,7 @@ export default function CoursesScreen() {
           renderItem={({ item }) => (
             <Row
               title={displayName(item)}
-              subtitle={item.term}
+              subtitle={termLabel(item.term ?? termOf(item.name))}
               onPress={() =>
                 router.push({
                   pathname: '/course/[kind]/[id]',
@@ -68,16 +68,12 @@ export default function CoursesScreen() {
 }
 
 function inCurrentTerm(course: Course) {
-  const term = currentTerm();
-  const season = term.code.endsWith('SZ') ? 'SZ' : 'SL';
-  if (course.term) {
-    return course.term === term.code;
-  }
-  return course.name.includes(term.code) || course.name.includes(`${term.academic} ${season}`);
+  return (course.term ?? termOf(course.name)) === currentTerm().code;
 }
 
 function displayName(course: Course) {
-  return course.source === 'teams' ? course.name.replace(/^\d{4}\/(SZ|SL)\s+\S+\s+/, '') : course.name;
+  const name = course.source === 'teams' ? course.name.replace(/^\d{4}\/(SZ|SL)\s+\S+\s+/, '') : course.name;
+  return name.replace(/\s*\((\d{4}[^)]*|[^)]*\d{4}[^)]*)\)/g, '').trim();
 }
 
 const styles = StyleSheet.create({

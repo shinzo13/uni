@@ -1,8 +1,10 @@
 const WEEKDAY = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-const SHORT_DATE = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
+const SHORT_DATE = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit' });
+const FULL_DATE = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 const DATE_TIME = new Intl.DateTimeFormat('en-GB', {
-  day: 'numeric',
-  month: 'short',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
   hour: '2-digit',
   minute: '2-digit',
 });
@@ -30,11 +32,15 @@ export function formatDay(value: string | Date) {
 }
 
 export function formatShortDate(value: string | Date) {
-  return SHORT_DATE.format(new Date(value));
+  return SHORT_DATE.format(new Date(value)).replace(/\//g, '.');
+}
+
+export function formatFullDate(value: string | Date) {
+  return FULL_DATE.format(new Date(value)).replace(/\//g, '.');
 }
 
 export function formatDateTime(value: string) {
-  return DATE_TIME.format(new Date(value));
+  return DATE_TIME.format(new Date(value)).replace(/\//g, '.');
 }
 
 export function formatTime(value: string) {
@@ -80,4 +86,27 @@ export function currentTerm(now = new Date()) {
     return { year: year - 1, code: `${year - 1}/SZ`, academic: `${year - 1}/${String(year).slice(2)}` };
   }
   return { year: year - 1, code: `${year}/SL`, academic: `${year - 1}/${String(year).slice(2)}` };
+}
+
+export function termOf(name: string) {
+  const short = name.match(/\b(\d{4})\/(SZ|SL)\b/);
+  if (short) {
+    return `${short[1]}/${short[2]}`;
+  }
+  const academic = name.match(/\b(\d{4})\/(\d{2})\s*(SZ|SL)\b/);
+  if (academic) {
+    return academic[3] === 'SZ' ? `${academic[1]}/SZ` : `${Number(academic[1]) + 1}/SL`;
+  }
+  return null;
+}
+
+export function termLabel(code: string | null) {
+  const match = code?.match(/^(\d{4})\/(SZ|SL)$/);
+  if (!match) {
+    return 'Other';
+  }
+  const year = Number(match[1]);
+  return match[2] === 'SZ'
+    ? `Winter ${year}/${String(year + 1).slice(2)}`
+    : `Summer ${year - 1}/${String(year).slice(2)}`;
 }

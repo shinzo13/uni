@@ -106,6 +106,7 @@ function MaterialRow({ item, kind, expanded, onToggle }: MaterialProps) {
             </Text>
           ) : null}
           <Attachments source={kind} attachments={item.attachments} />
+          {!body && item.attachments.length === 0 ? <Text style={text.caption}>Empty</Text> : null}
         </View>
       ) : null}
     </Row>

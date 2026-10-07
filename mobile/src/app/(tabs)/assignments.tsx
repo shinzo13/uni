@@ -50,7 +50,7 @@ export default function AssignmentsScreen() {
             />
           }
           renderSectionHeader={({ section }) => <SectionHeader title={section.title} />}
-          renderItem={({ item }) => <AssignmentRow assignment={item} />}
+          renderItem={({ item }) => <AssignmentRow assignment={item} current={tab === 'current'} />}
           ListEmptyComponent={
             <EmptyState title={tab === 'current' ? 'Nothing due' : 'No past assignments'} />
           }
@@ -60,7 +60,7 @@ export default function AssignmentsScreen() {
   );
 }
 
-function AssignmentRow({ assignment }: { assignment: Assignment }) {
+function AssignmentRow({ assignment, current }: { assignment: Assignment; current: boolean }) {
   const status = STATUS_LABELS[assignment.status];
   const subtitle = [sourceNames[assignment.source], assignment.course_name, assignment.kind === 'quiz' ? 'Quiz' : null]
     .filter(Boolean)
@@ -68,7 +68,7 @@ function AssignmentRow({ assignment }: { assignment: Assignment }) {
   const due = assignment.due_at ? (
     <View style={styles.due}>
       <Text style={styles.dueDate}>{formatDateTime(assignment.due_at)}</Text>
-      <Text style={text.caption}>{assignment.grade ?? (isDone(assignment) ? status : relativeDue(assignment.due_at))}</Text>
+      <Text style={text.caption}>{assignment.grade ?? (current ? relativeDue(assignment.due_at) : status)}</Text>
     </View>
   ) : (
     <Text style={text.caption}>{assignment.grade ?? status}</Text>

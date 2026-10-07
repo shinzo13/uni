@@ -20,10 +20,12 @@ export type ClassSession = {
   course_id: string;
   course_name: string;
   kind: string;
+  kind_code: string | null;
   starts_at: string;
   ends_at: string;
   room: string | null;
   building: string | null;
+  address: string | null;
   group_number: number | null;
 };
 
@@ -97,13 +99,13 @@ export type Post = {
   attachments: Attachment[];
 };
 
-export type GradeKind = 'final' | 'partial' | 'points';
+export type GradeCategory = 'semester' | 'work' | 'assignment';
 
 export type Grade = {
   source: SourceKind;
   course_id: string;
   course_name: string;
-  kind: GradeKind;
+  category: GradeCategory;
   name: string;
   value: string;
   term: string | null;

@@ -3,6 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useAssignments } from '@/api/queries';
+import type { AssignmentStatus } from '@/api/types';
 import { Attachments } from '@/components/Attachments';
 import { EmptyState } from '@/components/EmptyState';
 import { Loading } from '@/components/Loading';
@@ -25,7 +26,7 @@ export default function AssignmentScreen() {
     ['Course', assignment.course_name],
     ['Due', assignment.due_at ? formatDateTime(assignment.due_at) : 'No deadline'],
     ['Opens', assignment.opens_at ? formatDateTime(assignment.opens_at) : null],
-    ['Status', assignment.status === 'unknown' ? null : assignment.status],
+    ['Status', statusLabel(assignment.status, assignment.due_at)],
     ['Submitted', assignment.submitted_at ? formatDateTime(assignment.submitted_at) : null],
     ['Grade', assignment.grade],
   ].filter((fact): fact is [string, string] => !!fact[1]);
@@ -33,7 +34,7 @@ export default function AssignmentScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Stack.Screen options={{ title: sourceNames[assignment.source] }} />
+      <Stack.Screen options={{ title: `${sourceNames[assignment.source]} ${assignment.kind === 'quiz' ? 'quiz' : 'assignment'}` }} />
       <Text style={styles.title}>{assignment.title}</Text>
       <View style={styles.facts}>
         {facts.map(([label, value]) => (
@@ -68,3 +69,19 @@ const styles = StyleSheet.create({
   button: { alignItems: 'center', paddingVertical: spacing.md, borderRadius: 12, backgroundColor: colors.accent },
   buttonLabel: { fontSize: 16, fontWeight: '600', color: colors.background },
 });
+
+function statusLabel(status: AssignmentStatus, dueAt: string | null) {
+  const overdue = !!dueAt && new Date(dueAt) < new Date();
+  switch (status) {
+    case 'new':
+      return overdue ? 'Not submitted, deadline passed' : 'Not submitted';
+    case 'draft':
+      return overdue ? 'Started, deadline passed' : 'In progress';
+    case 'submitted':
+      return 'Submitted';
+    case 'graded':
+      return 'Graded';
+    default:
+      return null;
+  }
+}

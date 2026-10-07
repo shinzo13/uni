@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as WebBrowser from 'expo-web-browser';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { apiUrl } from '@/api/client';
+import { request } from '@/api/client';
 import type { Attachment, SourceKind } from '@/api/types';
 import { useSession } from '@/session/SessionProvider';
 import { colors, spacing, text } from '@/theme';
@@ -17,8 +17,14 @@ export function Attachments({ source, attachments }: Props) {
   if (attachments.length === 0) {
     return null;
   }
-  const open = (attachment: Attachment) =>
-    WebBrowser.openBrowserAsync(apiUrl('/files', { kind: source, url: attachment.url, access_token: token ?? '' }));
+  const open = async (attachment: Attachment) => {
+    const link = await request<{ url: string }>('/files/link', {
+      method: 'POST',
+      token,
+      body: { kind: source, url: attachment.url },
+    });
+    await WebBrowser.openBrowserAsync(link.url);
+  };
   return (
     <View style={styles.list}>
       {attachments.map((attachment) => (
