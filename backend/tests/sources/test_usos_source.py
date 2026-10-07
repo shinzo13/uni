@@ -7,7 +7,7 @@ import httpx
 import pytest
 import respx
 
-from uni.domain import GradeKind
+from uni.domain import GradeCategory
 from uni.sources.base import SourceError
 from uni.sources.usos.client import UsosClient
 from uni.sources.usos.oauth import Consumer, Token
@@ -45,7 +45,9 @@ async def test_classes_are_fetched_week_by_week(source):
                     "end_time": f"{params['start']} 09:45:00",
                     "course_id": "C1",
                     "course_name": {"pl": "Analiza", "en": "Analysis"},
+                    "classtype_id": "WYK",
                     "classtype_name": {"pl": "Wykład", "en": "Lecture"},
+                    "building_id": "090",
                     "building_name": {"pl": "Collegium", "en": ""},
                     "room_number": "A",
                     "group_number": 1,
@@ -54,12 +56,20 @@ async def test_classes_are_fetched_week_by_week(source):
         )
 
     route("tt/student", timetable)
+    route(
+        "geo/building2",
+        lambda request: httpx.Response(
+            200, json={"id": "090", "postal_address": "Uniwersytetu Poznańskiego 4"}
+        ),
+    )
     classes = await source.classes(date(2026, 10, 1), date(2026, 10, 16))
 
     assert starts == [("2026-10-01", "7"), ("2026-10-08", "7"), ("2026-10-15", "2")]
     assert len(classes) == 3
     assert classes[0].starts_at == datetime(2026, 10, 1, 8, 15, tzinfo=WARSAW)
     assert classes[0].kind == "Wykład"
+    assert classes[0].kind_code == "WYK"
+    assert classes[0].address == "Uniwersytetu Poznańskiego 4"
 
 
 @respx.mock
@@ -156,9 +166,9 @@ async def test_test_results_walk_the_node_tree(source):
 
     results = await source._test_results()
 
-    assert [(r.kind, r.name, r.value, r.max_value) for r in results] == [
-        (GradeKind.POINTS, "Kolokwia / Zadanie 1", "3.0", "5.0"),
-        (GradeKind.PARTIAL, "Kolokwia / Ocena", "4", None),
+    assert [(r.category, r.name, r.value, r.max_value) for r in results] == [
+        (GradeCategory.WORK, "Kolokwia / Zadanie 1", "3.0", "5.0"),
+        (GradeCategory.WORK, "Kolokwia / Ocena", "4", None),
     ]
     assert results[1].comment == "ok"
     requested = {call.request.url.path: form(call.request) for call in respx.calls}

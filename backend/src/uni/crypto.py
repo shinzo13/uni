@@ -14,5 +14,5 @@ class SecretBox:
     def seal(self, value: dict[str, Any]) -> str:
         return self._fernet.encrypt(json.dumps(value).encode()).decode()
 
-    def open(self, sealed: str) -> dict[str, Any]:
-        return json.loads(self._fernet.decrypt(sealed.encode()))
+    def open(self, sealed: str, max_age: int | None = None) -> dict[str, Any]:
+        return json.loads(self._fernet.decrypt(sealed.encode(), ttl=max_age))

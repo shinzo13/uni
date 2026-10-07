@@ -10,9 +10,9 @@ from uni.domain import (
     Attachment,
     Course,
     Grade,
-    GradeKind,
     Post,
     SourceKind,
+    assessed_category,
 )
 from uni.sources.teams.client import TeamsClient
 
@@ -151,7 +151,7 @@ class TeamsSource:
                 source=self.kind,
                 course_id=class_id,
                 course_name=class_name,
-                kind=GradeKind.POINTS,
+                category=assessed_category(assignment["displayName"]),
                 name=assignment["displayName"],
                 value=points.split(" / ")[0],
                 term=term_of(class_name),

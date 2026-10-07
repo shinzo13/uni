@@ -12,10 +12,11 @@ from uni.domain import (
     CourseItem,
     CourseSection,
     Grade,
-    GradeKind,
+    GradeCategory,
     ItemKind,
     Post,
     SourceKind,
+    assessed_category,
 )
 from uni.sources.base import SourceError
 from uni.sources.moodle.client import MoodleClient
@@ -267,6 +268,11 @@ class MoodleSource:
         submitted_at = timestamp(max(attempt["timefinish"] for attempt in finished)) if finished else None
         return status, submitted_at, grade
 
+    def _item_category(self, item: dict[str, Any]) -> GradeCategory:
+        if item.get("itemmodule") in {"assign", "quiz"}:
+            return assessed_category(item.get("itemname") or "")
+        return GradeCategory.WORK
+
     def _course_grades(self, course: dict[str, Any], items: list[dict[str, Any]]) -> list[Grade]:
         grades = []
         for item in items:
@@ -279,7 +285,7 @@ class MoodleSource:
                     source=self.kind,
                     course_id=str(course["id"]),
                     course_name=course["fullname"],
-                    kind=GradeKind.FINAL if is_total else GradeKind.POINTS,
+                    category=GradeCategory.SEMESTER if is_total else self._item_category(item),
                     name="Course total" if is_total else item.get("itemname") or "",
                     value=value,
                     max_value=f"{item['grademax']:g}" if item.get("grademax") is not None else None,

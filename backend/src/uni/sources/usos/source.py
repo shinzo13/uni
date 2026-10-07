@@ -10,14 +10,15 @@ from uni.domain import (
     Course,
     Exam,
     Grade,
-    GradeKind,
+    GradeCategory,
     SourceKind,
 )
 from uni.sources.usos.client import UsosClient
 
 WARSAW = ZoneInfo("Europe/Warsaw")
 TIMETABLE_FIELDS = (
-    "start_time|end_time|course_id|course_name|classtype_name|building_name|room_number|group_number"
+    "start_time|end_time|course_id|course_name|classtype_id|classtype_name|building_id|building_name|room_number"
+    "|group_number"
 )
 GRADE_FIELDS = "value_symbol|passes|value_description|exam_session_number|comment|date_modified"
 EXAM_FIELDS = "id|name|course|groups[exam_start|exam_end|room]"
@@ -77,7 +78,24 @@ class UsosSource:
                 for chunk_start, days in date_chunks(start, end, TIMETABLE_MAX_DAYS)
             )
         )
-        return [self._class_session(entry) for week in weeks for entry in week]
+        entries = [entry for week in weeks for entry in week]
+        addresses = await self._building_addresses(
+            {entry["building_id"] for entry in entries if entry.get("building_id")}
+        )
+        return [self._class_session(entry, addresses) for entry in entries]
+
+    async def _building_addresses(self, building_ids: set[str]) -> dict[str, str]:
+        buildings = await asyncio.gather(
+            *(
+                self.client.call("geo/building2", building_id=building_id, fields="id|postal_address")
+                for building_id in sorted(building_ids)
+            )
+        )
+        return {
+            building["id"]: building["postal_address"]
+            for building in buildings
+            if building.get("postal_address")
+        }
 
     async def exams(self) -> list[Exam]:
         payload = await self.client.call("exams/student_exams", fields=EXAM_FIELDS)
@@ -147,12 +165,14 @@ class UsosSource:
             found.update(course["fac_id"] for course in courses.values() if course)
         return sorted(found)
 
-    def _class_session(self, entry: dict[str, Any]) -> ClassSession:
+    def _class_session(self, entry: dict[str, Any], addresses: dict[str, str]) -> ClassSession:
         return ClassSession(
             source=self.kind,
             course_id=entry["course_id"],
             course_name=text(entry["course_name"]),
             kind=text(entry["classtype_name"]),
+            kind_code=entry.get("classtype_id"),
+            address=addresses.get(entry.get("building_id") or ""),
             starts_at=local_datetime(entry["start_time"]),
             ends_at=local_datetime(entry["end_time"]),
             room=entry.get("room_number"),
@@ -183,9 +203,7 @@ class UsosSource:
             for course_id, course in courses.items():
                 course_name = names.get((term, course_id), course_id)
                 for sessions in course["course_grades"]:
-                    grades += self._session_grades(
-                        sessions, term, course_id, course_name, "Course", GradeKind.FINAL
-                    )
+                    grades += self._session_grades(sessions, term, course_id, course_name, "Course")
                 for unit_id, unit_sessions in course["course_units_grades"].items():
                     for sessions in unit_sessions:
                         grades += self._session_grades(
@@ -194,7 +212,6 @@ class UsosSource:
                             course_id,
                             course_name,
                             classtypes.get(unit_id, unit_id),
-                            GradeKind.PARTIAL,
                         )
         return grades
 
@@ -222,14 +239,13 @@ class UsosSource:
         course_id: str,
         course_name: str,
         name: str,
-        kind: GradeKind,
     ) -> list[Grade]:
         return [
             Grade(
                 source=self.kind,
                 course_id=course_id,
                 course_name=course_name,
-                kind=kind,
+                category=GradeCategory.SEMESTER,
                 name=name if session == "1" else f"{name} (attempt {session})",
                 value=grade["value_symbol"],
                 term=term,
@@ -275,7 +291,7 @@ class UsosSource:
                     source=self.kind,
                     course_id=edition["course_id"],
                     course_name=text(edition["course_name"]),
-                    kind=GradeKind.POINTS if grade is None else GradeKind.PARTIAL,
+                    category=GradeCategory.WORK,
                     name=f"{text(root['name'])} / {text(node['name'])}",
                     value=str(entry["points"]) if grade is None else grade["symbol"],
                     term=edition["term_id"],

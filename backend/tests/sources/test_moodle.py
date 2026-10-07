@@ -6,7 +6,7 @@ import httpx
 import pytest
 import respx
 
-from uni.domain import AssignmentKind, AssignmentStatus, GradeKind, ItemKind
+from uni.domain import AssignmentKind, AssignmentStatus, GradeCategory, ItemKind
 from uni.sources.base import CredentialsExpired, SourceError
 from uni.sources.moodle.client import MoodleClient, flatten, launch_url, token_from_launch
 from uni.sources.moodle.source import MoodleSource
@@ -133,6 +133,7 @@ async def test_grades_skip_categories_and_hidden_reports(source):
                                 {"itemtype": "category", "gradeformatted": "10,00", "grademax": 10},
                                 {
                                     "itemtype": "mod",
+                                    "itemmodule": "assign",
                                     "itemname": "Lab 1",
                                     "gradeformatted": "10,00",
                                     "grademax": 10,
@@ -154,9 +155,9 @@ async def test_grades_skip_categories_and_hidden_reports(source):
 
     grades = await source.grades()
 
-    assert [(grade.kind, grade.name, grade.value, grade.max_value) for grade in grades] == [
-        (GradeKind.FINAL, "Course total", "59,33 (4,5)", "70"),
-        (GradeKind.POINTS, "Lab 1", "10,00", "10"),
+    assert [(grade.category, grade.name, grade.value, grade.max_value) for grade in grades] == [
+        (GradeCategory.SEMESTER, "Course total", "59,33 (4,5)", "70"),
+        (GradeCategory.ASSIGNMENT, "Lab 1", "10,00", "10"),
     ]
 
 

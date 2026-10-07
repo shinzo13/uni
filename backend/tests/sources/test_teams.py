@@ -2,7 +2,7 @@ import httpx
 import pytest
 import respx
 
-from uni.domain import AssignmentStatus, GradeKind
+from uni.domain import AssignmentStatus, GradeCategory
 from uni.sources.base import CredentialsExpired
 from uni.sources.teams.client import ASSIGNMENTS_URL, AUTHORITY, GRAPH_URL, TeamsClient
 from uni.sources.teams.source import TeamsSource, term_of
@@ -105,8 +105,8 @@ async def test_assignments_use_submission_status_and_outcomes():
     assert assignments["a2"].status == AssignmentStatus.GRADED
     assert assignments["a2"].grade == "54 / 60"
     assert assignments["a2"].description_html == "<p>go</p>"
-    assert [(grade.kind, grade.value, grade.max_value, grade.term) for grade in grades] == [
-        (GradeKind.POINTS, "54", "60", "2026/SL")
+    assert [(grade.category, grade.value, grade.max_value, grade.term) for grade in grades] == [
+        (GradeCategory.WORK, "54", "60", "2026/SL")
     ]
 
 

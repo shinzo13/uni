@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime
 from enum import StrEnum
 
@@ -34,10 +35,12 @@ class ClassSession(Model):
     course_id: str
     course_name: str
     kind: str
+    kind_code: str | None = None
     starts_at: datetime
     ends_at: datetime
     room: str | None = None
     building: str | None = None
+    address: str | None = None
     group_number: int | None = None
 
 
@@ -132,17 +135,24 @@ class Post(Model):
     attachments: tuple[Attachment, ...] = ()
 
 
-class GradeKind(StrEnum):
-    FINAL = "final"
-    PARTIAL = "partial"
-    POINTS = "points"
+class GradeCategory(StrEnum):
+    SEMESTER = "semester"
+    WORK = "work"
+    ASSIGNMENT = "assignment"
+
+
+WORK_NAMES = re.compile(r"kolokw|kolos|egzamin|exam|test|sprawdzian|kartk|midterm", re.IGNORECASE)
+
+
+def assessed_category(name: str) -> GradeCategory:
+    return GradeCategory.WORK if WORK_NAMES.search(name) else GradeCategory.ASSIGNMENT
 
 
 class Grade(Model):
     source: SourceKind
     course_id: str
     course_name: str
-    kind: GradeKind
+    category: GradeCategory
     name: str
     value: str
     term: str | None = None

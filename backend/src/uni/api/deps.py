@@ -2,7 +2,7 @@ from collections.abc import AsyncIterator
 from datetime import timedelta
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Query, Request, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,10 +44,8 @@ AccountsDep = Annotated[Accounts, Depends(get_accounts)]
 async def get_user(
     accounts: AccountsDep,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
-    access_token: Annotated[str | None, Query(include_in_schema=False)] = None,
 ) -> User:
-    token = credentials.credentials if credentials else access_token
-    user = await accounts.user_for_token(token) if token else None
+    user = await accounts.user_for_token(credentials.credentials) if credentials else None
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "not signed in")
     return user

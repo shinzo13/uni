@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from uni.domain import Assignment, SourceKind
-from uni.models import SourceLink, User
+from uni.models import Snapshot, SourceLink, User
 from uni.sources.base import CredentialsExpired, SourceError
 
 
@@ -95,3 +95,18 @@ async def test_stale_snapshot_is_served_and_revalidated(signed_in, linked, app):
 
     assert [item["title"] for item in stale.json()["items"]] == ["Old"]
     assert [item["title"] for item in revalidated.json()["items"]] == ["New"]
+
+
+async def test_snapshot_with_outdated_schema_is_refetched(signed_in, linked, app):
+    linked["moodle"] = FakeSource(SourceKind.MOODLE, [assignment(SourceKind.MOODLE, "Lab")])
+    linked["teams"] = FakeSource(SourceKind.TEAMS, [])
+    await signed_in.get("/assignments")
+    async with app.state.database.sessions() as session:
+        for snapshot in await session.scalars(select(Snapshot)):
+            snapshot.payload = [{"unexpected": True}]
+        await session.commit()
+
+    response = await signed_in.get("/assignments")
+
+    assert [item["title"] for item in response.json()["items"]] == ["Lab"]
+    assert linked["moodle"].calls == 2

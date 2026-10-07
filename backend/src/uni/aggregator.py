@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel, TypeAdapter, ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -117,12 +117,16 @@ class Aggregator:
         ]
         sources = [(link, self.registry.build(link)) for link in links]
         capable = [(link, source) for link, source in sources if isinstance(source, capability)]
-        snapshots = {
+        stored = {
             snapshot.kind: snapshot
             for snapshot in await self.db.scalars(
                 select(Snapshot).where(Snapshot.user_id == self.user.id, Snapshot.dataset == dataset)
             )
         }
+        snapshots = dict(stored)
+        adapter = TypeAdapter(list[model])
+        for kind in [kind for kind, snapshot in snapshots.items() if not _matches(adapter, snapshot)]:
+            del snapshots[kind]
         blocking = [(link, source) for link, source in capable if refresh or snapshots.get(link.kind) is None]
         for link, _ in capable:
             snapshot = snapshots.get(link.kind)
@@ -130,21 +134,18 @@ class Aggregator:
                 self.revalidator.schedule(self.user.id, link.kind, dataset, fetch)
         results = await asyncio.gather(
             *(
-                refresh_snapshot(
-                    self.db, self.registry, link, dataset, fetch, snapshots.get(link.kind), source
-                )
+                refresh_snapshot(self.db, self.registry, link, dataset, fetch, stored.get(link.kind), source)
                 for link, source in blocking
             )
         )
         errors: dict[str, str] = {}
         for (link, _), (snapshot, error) in zip(blocking, results, strict=True):
-            if snapshot is not None:
+            if snapshot is not None and _matches(adapter, snapshot):
                 snapshots[link.kind] = snapshot
             if error:
                 errors[link.kind] = error
         await self.db.commit()
 
-        adapter = TypeAdapter(list[model])
         collected: Collected[T] = Collected()
         for link, _ in capable:
             snapshot = snapshots.get(link.kind)
@@ -164,3 +165,11 @@ class Aggregator:
             snapshot.fetched_at if snapshot.fetched_at.tzinfo else snapshot.fetched_at.replace(tzinfo=UTC)
         )
         return datetime.now(UTC) - fetched < self.max_age
+
+
+def _matches(adapter: TypeAdapter, snapshot: Snapshot) -> bool:
+    try:
+        adapter.validate_python(snapshot.payload)
+    except ValidationError:
+        return False
+    return True
