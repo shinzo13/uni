@@ -141,7 +141,7 @@ class GradeCategory(StrEnum):
     ASSIGNMENT = "assignment"
 
 
-WORK_NAMES = re.compile(r"kolokw|kolos|egzamin|exam|test|sprawdzian|kartk|midterm", re.IGNORECASE)
+WORK_NAMES = re.compile(r"kolokw|kolos|\bkol\b|egzamin|exam|test|sprawdzian|kartk|midterm", re.IGNORECASE)
 
 
 def assessed_category(name: str) -> GradeCategory:

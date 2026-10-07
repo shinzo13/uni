@@ -43,7 +43,7 @@ Backend (`backend/`, Python 3.13, uv, FastAPI, SQLAlchemy async, PostgreSQL):
     uv run uvicorn uni.api.app:create_app --factory --reload
     uv run pytest && uv run ruff check . && uv run ruff format --check .
 
-Settings come from `backend/.env` with the `UNI_` prefix (see `.env.example`). Layers: `sources/` (adapters, one package per source) → `aggregator.py` (snapshot cache, stale-while-revalidate) → `api/routes/`. Source credentials are encrypted with `UNI_SECRET_KEY`.
+Settings come from `backend/.env` with the `UNI_` prefix (see `.env.example`). Layers: `sources/` (adapters, one package per source) → `aggregator.py` (snapshot cache, stale-while-revalidate) → `api/routes/`. Source credentials are encrypted with `UNI_SECRET_KEY`. Bump `SNAPSHOT_VERSION` in `aggregator.py` whenever domain models change, so cached snapshots are refetched.
 
 Mobile (`mobile/`, Expo SDK 57, expo-router, TanStack Query):
 

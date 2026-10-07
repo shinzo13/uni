@@ -110,3 +110,10 @@ export function termLabel(code: string | null) {
     ? `Winter ${year}/${String(year + 1).slice(2)}`
     : `Summer ${year - 1}/${String(year).slice(2)}`;
 }
+
+export function courseTitle(name: string) {
+  return name
+    .replace(/^\d{4}\/(SZ|SL)\s+\S+\s+/, '')
+    .replace(/\s*\([^)]*\)/g, '')
+    .trim();
+}

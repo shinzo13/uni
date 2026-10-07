@@ -9,7 +9,7 @@ import { Loading } from '@/components/Loading';
 import { Row, SectionHeader } from '@/components/Row';
 import { Segmented } from '@/components/Segmented';
 import { SourceIssues } from '@/components/SourceIssues';
-import { currentTerm, termLabel, termOf } from '@/format';
+import { courseTitle, currentTerm, termLabel, termOf } from '@/format';
 import { colors, sourceNames } from '@/theme';
 
 type Scope = 'current' | 'all';
@@ -72,8 +72,7 @@ function inCurrentTerm(course: Course) {
 }
 
 function displayName(course: Course) {
-  const name = course.source === 'teams' ? course.name.replace(/^\d{4}\/(SZ|SL)\s+\S+\s+/, '') : course.name;
-  return name.replace(/\s*\((\d{4}[^)]*|[^)]*\d{4}[^)]*)\)/g, '').trim();
+  return courseTitle(course.name);
 }
 
 const styles = StyleSheet.create({

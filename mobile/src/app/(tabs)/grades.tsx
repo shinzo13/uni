@@ -8,7 +8,7 @@ import { Loading } from '@/components/Loading';
 import { SectionHeader } from '@/components/Row';
 import { Segmented } from '@/components/Segmented';
 import { SourceIssues } from '@/components/SourceIssues';
-import { termLabel, termOf } from '@/format';
+import { courseTitle, termLabel, termOf } from '@/format';
 import { colors, sourceNames, spacing, text } from '@/theme';
 
 type CourseGrades = {
@@ -138,13 +138,13 @@ function groupByCourse(grades: Grade[], category: GradeCategory): CourseGrades[]
     const key = `${grade.term ?? termOf(grade.course_name) ?? ''}:${courseKey(grade.course_name)}`;
     const course = courses.get(key) ?? {
       key,
-      name: grade.course_name,
+      name: courseTitle(grade.course_name),
       term: grade.term ?? termOf(grade.course_name),
       summary: null,
       grades: [],
     };
     if (grade.source === 'usos') {
-      course.name = grade.course_name;
+      course.name = courseTitle(grade.course_name);
     }
     course.grades.push(grade);
     courses.set(key, course);

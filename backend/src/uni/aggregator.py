@@ -17,6 +17,7 @@ from uni.sources.base import CredentialsExpired, Source
 log = logging.getLogger(__name__)
 
 Fetch = Callable[[Any], Awaitable[list[BaseModel]]]
+SNAPSHOT_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -110,6 +111,7 @@ class Aggregator:
         refresh: bool = False,
         only: SourceKind | None = None,
     ) -> Collected[T]:
+        dataset = f"{dataset}@v{SNAPSHOT_VERSION}"
         links = [
             link
             for link in await self.db.scalars(select(SourceLink).where(SourceLink.user_id == self.user.id))
