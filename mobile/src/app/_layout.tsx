@@ -55,6 +55,7 @@ function RootNavigator() {
         <Stack.Screen name="sources" options={{ title: 'Sources', presentation: 'modal' }} />
         <Stack.Screen name="course/[kind]/[id]" options={{ title: '' }} />
         <Stack.Screen name="assignment/[id]" options={{ title: '' }} />
+        <Stack.Screen name="page/[kind]/[course]/[item]" options={{ title: '' }} />
       </Stack.Protected>
       <Stack.Protected guard={!token}>
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />

@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useMemo, useState } from 'react';
 import { FlatList, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
@@ -73,6 +73,7 @@ function Materials({ kind, courseId }: { kind: SourceKind; courseId: string }) {
         <MaterialRow
           item={item}
           kind={kind}
+          courseId={courseId}
           expanded={expanded === item.id}
           onToggle={() => setExpanded(expanded === item.id ? null : item.id)}
         />
@@ -85,17 +86,21 @@ function Materials({ kind, courseId }: { kind: SourceKind; courseId: string }) {
 type MaterialProps = {
   item: CourseItem;
   kind: SourceKind;
+  courseId: string;
   expanded: boolean;
   onToggle: () => void;
 };
 
-function MaterialRow({ item, kind, expanded, onToggle }: MaterialProps) {
+function MaterialRow({ item, kind, courseId, expanded, onToggle }: MaterialProps) {
   const body = plainText(item.html);
   if (item.kind === 'label') {
     return <Text style={styles.label}>{body}</Text>;
   }
-  const inline = item.kind === 'page' || item.kind === 'file' || item.kind === 'folder';
-  const onPress = inline ? onToggle : item.url ? () => WebBrowser.openBrowserAsync(item.url!) : undefined;
+  const inline = item.kind === 'file' || item.kind === 'folder';
+  const openPage = () =>
+    router.push({ pathname: '/page/[kind]/[course]/[item]', params: { kind, course: courseId, item: item.id } });
+  const openUrl = item.url ? () => WebBrowser.openBrowserAsync(item.url!) : undefined;
+  const onPress = item.kind === 'page' ? openPage : inline ? onToggle : openUrl;
   return (
     <Row title={item.title} subtitle={ITEM_LABELS[item.kind]} onPress={onPress}>
       {expanded ? (
