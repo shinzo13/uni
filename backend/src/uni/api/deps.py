@@ -12,6 +12,7 @@ from uni.config import Settings
 from uni.linking import Linker
 from uni.models import User
 from uni.registry import SourceRegistry
+from uni.subjects import Subjects
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -68,3 +69,10 @@ def get_aggregator(
 
 LinkerDep = Annotated[Linker, Depends(get_linker)]
 AggregatorDep = Annotated[Aggregator, Depends(get_aggregator)]
+
+
+def get_subjects(db: Db, user: CurrentUser) -> Subjects:
+    return Subjects(db, user)
+
+
+SubjectsDep = Annotated[Subjects, Depends(get_subjects)]

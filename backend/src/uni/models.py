@@ -60,3 +60,23 @@ class Snapshot(Base):
     dataset: Mapped[str] = mapped_column(String(64), primary_key=True)
     payload: Mapped[list] = mapped_column(JSON)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class Subject(Base):
+    __tablename__ = "subjects"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str | None] = mapped_column(String(120))
+    color: Mapped[str | None] = mapped_column(String(7))
+    icon: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class SubjectCourse(Base):
+    __tablename__ = "subject_courses"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), primary_key=True)
+    course_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    subject_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("subjects.id", ondelete="CASCADE"), index=True)

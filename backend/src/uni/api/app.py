@@ -4,7 +4,7 @@ import httpx
 from fastapi import FastAPI
 
 from uni.aggregator import Revalidator
-from uni.api.routes import auth, data, files, sources
+from uni.api.routes import auth, data, files, sources, subjects
 from uni.config import Settings, settings
 from uni.crypto import SecretBox
 from uni.db import Database
@@ -27,7 +27,7 @@ def create_app(config: Settings | None = None) -> FastAPI:
         await database.dispose()
 
     app = FastAPI(title="uni", lifespan=lifespan)
-    for router in (auth.router, sources.router, data.router, files.router):
+    for router in (auth.router, sources.router, data.router, files.router, subjects.router):
         app.include_router(router)
 
     @app.get("/health", include_in_schema=False)
