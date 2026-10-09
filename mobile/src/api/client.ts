@@ -1,5 +1,7 @@
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 
+const TIMEOUT_MS = 20_000;
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -25,6 +27,8 @@ export function apiUrl(path: string, params: Options['params'] = {}) {
 }
 
 export async function request<T>(path: string, { method = 'GET', body, token, params }: Options = {}): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   const response = await fetch(apiUrl(path, params), {
     method,
     headers: {
@@ -33,7 +37,12 @@ export async function request<T>(path: string, { method = 'GET', body, token, pa
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+    signal: controller.signal,
+  })
+    .catch((error: Error) => {
+      throw new ApiError(0, controller.signal.aborted ? `${API_URL} is not reachable` : error.message);
+    })
+    .finally(() => clearTimeout(timer));
   if (!response.ok) {
     const payload = await response.json().catch(() => null);
     const detail = typeof payload?.detail === 'string' ? payload.detail : response.statusText;
