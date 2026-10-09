@@ -9,7 +9,9 @@ import { Loading } from '@/components/Loading';
 import { Row, SectionHeader } from '@/components/Row';
 import { Segmented } from '@/components/Segmented';
 import { SourceIssues } from '@/components/SourceIssues';
+import { SubjectIcon } from '@/components/SubjectIcon';
 import { formatDateTime, relativeDue } from '@/format';
+import { type Resolve, useSubjectResolver } from '@/subjects';
 import { colors, sourceNames, text } from '@/theme';
 
 type Tab = 'current' | 'archive';
@@ -30,6 +32,7 @@ const STATUS_LABELS: Record<Assignment['status'], string> = {
 export default function AssignmentsScreen() {
   const [tab, setTab] = useState<Tab>('current');
   const assignments = useAssignments();
+  const resolve = useSubjectResolver();
   const sections = useMemo(() => group(assignments.data?.items ?? [], tab), [assignments.data, tab]);
 
   return (
@@ -50,7 +53,7 @@ export default function AssignmentsScreen() {
             />
           }
           renderSectionHeader={({ section }) => <SectionHeader title={section.title} />}
-          renderItem={({ item }) => <AssignmentRow assignment={item} current={tab === 'current'} />}
+          renderItem={({ item }) => <AssignmentRow assignment={item} current={tab === 'current'} resolve={resolve} />}
           ListEmptyComponent={
             <EmptyState title={tab === 'current' ? 'Nothing due' : 'No past assignments'} />
           }
@@ -60,9 +63,16 @@ export default function AssignmentsScreen() {
   );
 }
 
-function AssignmentRow({ assignment, current }: { assignment: Assignment; current: boolean }) {
+type RowProps = {
+  assignment: Assignment;
+  current: boolean;
+  resolve: Resolve;
+};
+
+function AssignmentRow({ assignment, current, resolve }: RowProps) {
+  const look = resolve(assignment.source, assignment.course_id, assignment.course_name);
   const status = STATUS_LABELS[assignment.status];
-  const subtitle = [sourceNames[assignment.source], assignment.course_name, assignment.kind === 'quiz' ? 'Quiz' : null]
+  const subtitle = [look.name, sourceNames[assignment.source], assignment.kind === 'quiz' ? 'Quiz' : null]
     .filter(Boolean)
     .join(' · ');
   const due = assignment.due_at ? (
@@ -78,6 +88,7 @@ function AssignmentRow({ assignment, current }: { assignment: Assignment; curren
       title={assignment.title}
       subtitle={subtitle}
       detail={due}
+      leading={<SubjectIcon icon={look.icon} color={look.color} size={32} />}
       onPress={() =>
         router.push({ pathname: '/assignment/[id]', params: { id: assignment.id, source: assignment.source } })
       }

@@ -7,13 +7,21 @@ type Props = PropsWithChildren<{
   title: string;
   subtitle?: string | null;
   detail?: ReactNode;
+  leading?: ReactNode;
   onPress?: () => void;
+  onLongPress?: () => void;
   muted?: boolean;
 }>;
 
-export function Row({ title, subtitle, detail, onPress, muted, children }: Props) {
+export function Row({ title, subtitle, detail, leading, onPress, onLongPress, muted, children }: Props) {
   return (
-    <Pressable onPress={onPress} disabled={!onPress} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+    <Pressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      disabled={!onPress && !onLongPress}
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+    >
+      {leading}
       <View style={styles.main}>
         <Text style={[text.body, muted && styles.mutedText]} numberOfLines={2}>
           {title}

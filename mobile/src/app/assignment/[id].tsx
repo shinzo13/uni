@@ -8,11 +8,13 @@ import { Attachments } from '@/components/Attachments';
 import { EmptyState } from '@/components/EmptyState';
 import { Loading } from '@/components/Loading';
 import { formatDateTime, plainText } from '@/format';
+import { useSubjectResolver } from '@/subjects';
 import { colors, sourceNames, spacing, text } from '@/theme';
 
 export default function AssignmentScreen() {
   const { id, source } = useLocalSearchParams<{ id: string; source: string }>();
   const assignments = useAssignments();
+  const resolve = useSubjectResolver();
   const assignment = assignments.data?.items.find((item) => item.id === id && item.source === source);
 
   if (assignments.isLoading) {
@@ -23,7 +25,7 @@ export default function AssignmentScreen() {
   }
 
   const facts = [
-    ['Course', assignment.course_name],
+    ['Course', resolve(assignment.source, assignment.course_id, assignment.course_name).name],
     ['Due', assignment.due_at ? formatDateTime(assignment.due_at) : 'No deadline'],
     ['Opens', assignment.opens_at ? formatDateTime(assignment.opens_at) : null],
     ['Status', statusLabel(assignment.status, assignment.due_at)],

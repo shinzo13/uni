@@ -8,12 +8,15 @@ import { Loading } from '@/components/Loading';
 import { SectionHeader } from '@/components/Row';
 import { Segmented } from '@/components/Segmented';
 import { SourceIssues } from '@/components/SourceIssues';
+import { SubjectIcon } from '@/components/SubjectIcon';
 import { courseTitle, termLabel, termOf } from '@/format';
+import { editSubject, type Resolve, type SubjectLook, useSubjectResolver } from '@/subjects';
 import { colors, sourceNames, spacing, text } from '@/theme';
 
 type CourseGrades = {
   key: string;
   name: string;
+  look: SubjectLook | null;
   term: string | null;
   summary: string | null;
   grades: Grade[];
@@ -27,11 +30,19 @@ const CATEGORIES = [
 
 export default function GradesScreen() {
   const grades = useGrades();
+  const resolve = useSubjectResolver();
   const [category, setCategory] = useState<GradeCategory>('assignment');
   const [open, setOpen] = useState<string | null>(null);
   const sections = useMemo(
-    () => byTerm(groupByCourse((grades.data?.items ?? []).filter((grade) => grade.category === category), category)),
-    [grades.data, category],
+    () =>
+      byTerm(
+        groupByCourse(
+          (grades.data?.items ?? []).filter((grade) => grade.category === category),
+          category,
+          resolve,
+        ),
+      ),
+    [grades.data, category, resolve],
   );
 
   return (
@@ -73,7 +84,15 @@ function CourseBlock({ course, expanded, onToggle }: BlockProps) {
   const count = `${course.grades.length} ${course.grades.length === 1 ? 'entry' : 'entries'}`;
   return (
     <View style={styles.course}>
-      <Pressable onPress={onToggle} style={({ pressed }) => [styles.courseHeader, pressed && styles.pressed]}>
+      <Pressable
+        onPress={onToggle}
+        onLongPress={() => {
+          const [first] = course.grades;
+          editSubject(first.source, first.course_id, first.course_name);
+        }}
+        style={({ pressed }) => [styles.courseHeader, pressed && styles.pressed]}
+      >
+        <SubjectIcon icon={course.look?.icon ?? null} color={course.look?.color ?? null} />
         <View style={styles.courseMain}>
           <Text style={text.body} numberOfLines={2}>
             {course.name}
@@ -132,18 +151,29 @@ function summarize(grades: Grade[], category: GradeCategory) {
   return `${Number(total.toFixed(2))} / ${Number(max.toFixed(2))}`;
 }
 
-function groupByCourse(grades: Grade[], category: GradeCategory): CourseGrades[] {
+function groupByCourse(grades: Grade[], category: GradeCategory, resolve: Resolve): CourseGrades[] {
+  const nameKey = (grade: Grade) => `${grade.term ?? termOf(grade.course_name) ?? ''}:${courseKey(grade.course_name)}`;
+  const subjectOfName = new Map<string, SubjectLook>();
+  for (const grade of grades) {
+    const look = resolve(grade.source, grade.course_id, grade.course_name);
+    if (look.subject && !subjectOfName.has(nameKey(grade))) {
+      subjectOfName.set(nameKey(grade), look);
+    }
+  }
   const courses = new Map<string, CourseGrades>();
   for (const grade of grades) {
-    const key = `${grade.term ?? termOf(grade.course_name) ?? ''}:${courseKey(grade.course_name)}`;
+    const own = resolve(grade.source, grade.course_id, grade.course_name);
+    const look = own.subject ? own : (subjectOfName.get(nameKey(grade)) ?? null);
+    const key = look ? `${grade.term ?? termOf(grade.course_name) ?? ''}:${look.key}` : nameKey(grade);
     const course = courses.get(key) ?? {
       key,
-      name: courseTitle(grade.course_name),
+      name: look?.name ?? courseTitle(grade.course_name),
+      look,
       term: grade.term ?? termOf(grade.course_name),
       summary: null,
       grades: [],
     };
-    if (grade.source === 'usos') {
+    if (grade.source === 'usos' && !look) {
       course.name = courseTitle(grade.course_name);
     }
     course.grades.push(grade);

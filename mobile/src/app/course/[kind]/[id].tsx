@@ -1,16 +1,18 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useMemo, useState } from 'react';
-import { FlatList, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, ScrollView, SectionList, StyleSheet, Text, View } from 'react-native';
 
 import { usePosts, useSections } from '@/api/queries';
-import type { CourseItem, Post, SourceKind } from '@/api/types';
+import type { CourseItem, CourseRef, Post, SourceKind } from '@/api/types';
 import { Attachments } from '@/components/Attachments';
 import { EmptyState } from '@/components/EmptyState';
 import { Loading } from '@/components/Loading';
 import { Row, SectionHeader } from '@/components/Row';
 import { Segmented } from '@/components/Segmented';
-import { formatDateTime, plainText } from '@/format';
+import { courseTitle, formatDateTime, plainText } from '@/format';
+import { editSubject, refKey, useCourseIndex, useSubjectResolver } from '@/subjects';
 import { colors, spacing, text } from '@/theme';
 
 type Tab = 'materials' | 'posts';
@@ -33,16 +35,57 @@ const ITEM_LABELS: Record<CourseItem['kind'], string> = {
 
 export default function CourseScreen() {
   const { kind, id, name } = useLocalSearchParams<{ kind: SourceKind; id: string; name?: string }>();
-  const hasMaterials = kind === 'moodle';
-  const [tab, setTab] = useState<Tab>(hasMaterials ? 'materials' : 'posts');
+  const resolve = useSubjectResolver();
+  const index = useCourseIndex();
+  const look = resolve(kind, id, name);
+  const moodle = look.courses.filter((course) => course.source === 'moodle');
+  const [tab, setTab] = useState<Tab>(moodle.length ? 'materials' : 'posts');
+  const [picked, setPicked] = useState<string | null>(null);
+  const shown = moodle.find((course) => course.course_id === picked) ?? moodle[0];
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: name ?? '' }} />
-      {hasMaterials ? <Segmented options={TABS} value={tab} onChange={setTab} /> : null}
-      {tab === 'materials' ? <Materials kind={kind} courseId={id} /> : <Posts courseId={id} />}
+      <Stack.Screen
+        options={{
+          title: look.name,
+          headerRight: () => (
+            <Pressable accessibilityLabel="Edit subject" hitSlop={12} onPress={() => editSubject(kind, id, name)}>
+              <Ionicons name="color-palette-outline" size={22} color={colors.text} />
+            </Pressable>
+          ),
+        }}
+      />
+      {moodle.length ? <Segmented options={TABS} value={tab} onChange={setTab} /> : null}
+      {tab === 'materials' && moodle.length > 1 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips} contentContainerStyle={styles.chipRow}>
+          {moodle.map((course) => {
+            const selected = course === shown;
+            return (
+              <Pressable
+                key={course.course_id}
+                onPress={() => setPicked(course.course_id)}
+                style={[styles.chip, selected && { backgroundColor: look.color ?? colors.text }]}
+              >
+                <Text style={[styles.chipLabel, selected && styles.chipSelected]} numberOfLines={1}>
+                  {chipLabel(index.get(refKey('moodle', course.course_id))?.name ?? course.course_id)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      ) : null}
+      {tab === 'materials' && shown ? (
+        <Materials key={shown.course_id} kind="moodle" courseId={shown.course_id} />
+      ) : (
+        <Posts members={look.courses} />
+      )}
     </View>
   );
+}
+
+function chipLabel(name: string) {
+  const details = [...name.matchAll(/\(([^)]*)\)/g)].map((match) => match[1]).filter((part) => !/\d{4}/.test(part));
+  return details[0] ?? courseTitle(name);
 }
 
 function Materials({ kind, courseId }: { kind: SourceKind; courseId: string }) {
@@ -118,9 +161,14 @@ function MaterialRow({ item, kind, courseId, expanded, onToggle }: MaterialProps
   );
 }
 
-function Posts({ courseId }: { courseId: string }) {
+function Posts({ members }: { members: CourseRef[] }) {
   const posts = usePosts();
-  const items = useMemo(() => (posts.data?.items ?? []).filter((post) => post.course_id === courseId), [posts.data, courseId]);
+  const items = useMemo(() => {
+    const keys = new Set(members.map((member) => refKey(member.source, member.course_id)));
+    return (posts.data?.items ?? [])
+      .filter((post) => keys.has(refKey(post.source, post.course_id)))
+      .sort((a, b) => b.posted_at.localeCompare(a.posted_at));
+  }, [posts.data, members]);
 
   if (posts.isLoading) {
     return <Loading />;
@@ -164,6 +212,17 @@ function PostCard({ post }: { post: Post }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  chips: { flexGrow: 0 },
+  chipRow: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm },
+  chip: {
+    maxWidth: 220,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+  },
+  chipLabel: { fontSize: 14, color: colors.text },
+  chipSelected: { color: '#FFFFFF', fontWeight: '600' },
   expanded: { marginTop: spacing.sm, gap: spacing.sm },
   label: { ...text.body, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.muted },
   post: {

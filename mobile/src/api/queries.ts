@@ -15,6 +15,8 @@ import type {
   Post,
   SourceKind,
   SourceStatus,
+  Subject,
+  SubjectDraft,
 } from '@/api/types';
 import { useSession } from '@/session/SessionProvider';
 
@@ -104,4 +106,28 @@ export function useSourceActions() {
     };
   }, [queryClient, token]);
   return { ...actions, unlink };
+}
+
+export function useSubjects() {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ['subjects'],
+    queryFn: () => request<Subject[]>('/subjects', { token }),
+    enabled: !!token,
+  });
+}
+
+export function useSubjectActions() {
+  const { token } = useSession();
+  const queryClient = useQueryClient();
+  return useMemo(() => {
+    const invalidate = () => queryClient.invalidateQueries({ queryKey: ['subjects'] });
+    return {
+      save: (draft: SubjectDraft, id?: string) =>
+        request<Subject>(id ? `/subjects/${id}` : '/subjects', { method: id ? 'PUT' : 'POST', token, body: draft }).then(
+          invalidate,
+        ),
+      remove: (id: string) => request<void>(`/subjects/${id}`, { method: 'DELETE', token }).then(invalidate),
+    };
+  }, [queryClient, token]);
 }

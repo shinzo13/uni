@@ -138,3 +138,18 @@ export type LinkStart = {
   url: string;
   user_code: string | null;
 };
+
+export type CourseRef = {
+  source: SourceKind;
+  course_id: string;
+};
+
+export type Subject = {
+  id: string;
+  name: string | null;
+  color: string | null;
+  icon: string | null;
+  courses: CourseRef[];
+};
+
+export type SubjectDraft = Omit<Subject, 'id'>;

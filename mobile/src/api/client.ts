@@ -10,7 +10,7 @@ export class ApiError extends Error {
 }
 
 type Options = {
-  method?: 'GET' | 'POST' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
   token?: string | null;
   params?: Record<string, string | number | boolean | undefined>;

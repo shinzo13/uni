@@ -1,12 +1,15 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useAcademicEvents, useClasses, useExams } from '@/api/queries';
-import type { AcademicEvent, ClassSession, Exam } from '@/api/types';
+import type { AcademicEvent, ClassSession, Exam, SourceKind } from '@/api/types';
 import { Loading } from '@/components/Loading';
 import { SourceIssues } from '@/components/SourceIssues';
+import { isIconName } from '@/components/SubjectIcon';
 import { addDays, formatFullDate, formatTime, isoDate, startOfWeek } from '@/format';
+import { editSubject, type Resolve, useSubjectResolver } from '@/subjects';
 import { colors, spacing, text } from '@/theme';
 
 const HOUR_HEIGHT = 88;
@@ -29,6 +32,11 @@ type Block = {
   key: string;
   title: string;
   code: string;
+  color: string;
+  icon: string | null;
+  source: SourceKind;
+  courseId: string;
+  courseName: string;
   startsAt: Date;
   endsAt: Date;
   details: string[];
@@ -46,6 +54,7 @@ export default function ScheduleScreen() {
   const calendarEnd = isoDate(addDays(startOfWeek(today), CALENDAR_RANGE_DAYS));
 
   const classes = useClasses(start, end);
+  const resolve = useSubjectResolver();
   const exams = useExams();
   const events = useAcademicEvents(calendarStart, calendarEnd);
 
@@ -61,8 +70,8 @@ export default function ScheduleScreen() {
   const selected = addDays(weekStart, days.includes(dayIndex) ? dayIndex : 0);
   const date = isoDate(selected);
   const blocks = useMemo(
-    () => layout(toBlocks(date, classes.data?.items ?? [], exams.data?.items ?? [])),
-    [date, classes.data, exams.data],
+    () => layout(toBlocks(date, classes.data?.items ?? [], exams.data?.items ?? [], resolve)),
+    [date, classes.data, exams.data, resolve],
   );
   const dayEvents = (events.data?.items ?? []).filter((event) => event.starts_on <= date && date <= event.ends_on);
 
@@ -191,9 +200,13 @@ function DayGrid({ blocks, now }: { blocks: Block[]; now: Date | null }) {
 }
 
 function ClassBlock({ block, style }: { block: Block; style: object }) {
-  const color = KIND_COLORS[block.code] ?? FALLBACK_COLOR;
+  const color = block.color;
   return (
-    <View style={[styles.block, { borderColor: color }, style]}>
+    <Pressable
+      accessibilityLabel={`Edit ${block.title}`}
+      onPress={() => editSubject(block.source, block.courseId, block.courseName)}
+      style={({ pressed }) => [styles.block, { borderColor: color }, style, pressed && styles.blockPressed]}
+    >
       <View style={[styles.blockHeader, { backgroundColor: color }]}>
         <View style={styles.blockTopLine}>
           <Text style={styles.blockTime}>
@@ -201,9 +214,12 @@ function ClassBlock({ block, style }: { block: Block; style: object }) {
           </Text>
           <Text style={styles.blockCode}>{block.code}</Text>
         </View>
-        <Text style={styles.blockTitle} numberOfLines={2}>
-          {block.title}
-        </Text>
+        <View style={styles.blockTitleLine}>
+          {isIconName(block.icon) ? <MaterialCommunityIcons name={block.icon} size={16} color="#FFFFFF" /> : null}
+          <Text style={styles.blockTitle} numberOfLines={2}>
+            {block.title}
+          </Text>
+        </View>
       </View>
       <View style={styles.blockBody}>
         {block.details.map((line) => (
@@ -212,17 +228,28 @@ function ClassBlock({ block, style }: { block: Block; style: object }) {
           </Text>
         ))}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
-function toBlocks(date: string, classes: ClassSession[], exams: Exam[]): Block[] {
+function toBlocks(date: string, classes: ClassSession[], exams: Exam[], resolve: Resolve): Block[] {
+  const subject = (source: SourceKind, courseId: string, courseName: string, code: string) => {
+    const look = resolve(source, courseId, courseName);
+    return {
+      title: look.name,
+      code,
+      color: look.color ?? KIND_COLORS[code] ?? FALLBACK_COLOR,
+      icon: look.icon,
+      source,
+      courseId,
+      courseName,
+    };
+  };
   const lessons = classes
     .filter((item) => isoDate(new Date(item.starts_at)) === date)
     .map((item) => ({
       key: `class-${item.course_id}-${item.starts_at}`,
-      title: item.course_name,
-      code: item.kind_code ?? abbreviation(item.kind),
+      ...subject(item.source, item.course_id, item.course_name, item.kind_code ?? abbreviation(item.kind)),
       startsAt: new Date(item.starts_at),
       endsAt: new Date(item.ends_at),
       details: [item.address, [item.room && `room ${item.room}`, item.building].filter(Boolean).join(', ')].filter(
@@ -235,8 +262,7 @@ function toBlocks(date: string, classes: ClassSession[], exams: Exam[]): Block[]
     .filter((item) => isoDate(new Date(item.starts_at)) === date)
     .map((item) => ({
       key: `exam-${item.id}`,
-      title: item.course_name,
-      code: 'EXAM',
+      ...subject(item.source, item.course_id, item.course_name, 'EXAM'),
       startsAt: new Date(item.starts_at),
       endsAt: new Date(item.ends_at),
       details: [item.name, [item.room && `room ${item.room}`, item.building].filter(Boolean).join(', ')].filter(
@@ -333,7 +359,9 @@ const styles = StyleSheet.create({
   blockTopLine: { flexDirection: 'row', justifyContent: 'space-between' },
   blockTime: { fontSize: 13, color: '#FFFFFF', opacity: 0.9, fontVariant: ['tabular-nums'] },
   blockCode: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
-  blockTitle: { fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
+  blockPressed: { opacity: 0.8 },
+  blockTitleLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  blockTitle: { flexShrink: 1, fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
   blockBody: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, gap: 1 },
   blockDetail: { fontSize: 13, color: colors.text },
 });
