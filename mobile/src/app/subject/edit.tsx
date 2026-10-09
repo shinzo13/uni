@@ -15,7 +15,7 @@ import { DEFAULT_ICON, isIconName, SubjectIcon } from '@/components/SubjectIcon'
 import { courseTitle } from '@/format';
 import {
   courseCaption,
-  matchingUsosCourse,
+  sameCourses,
   refKey,
   type SubjectLook,
   suggestMerges,
@@ -27,7 +27,7 @@ import { colors, sourceNames, spacing, text } from '@/theme';
 const MAX_COURSES = 20;
 const INLINE_SUGGESTIONS = 3;
 
-function sameCourses(a: CourseRef[], b: CourseRef[]) {
+function sameRefs(a: CourseRef[], b: CourseRef[]) {
   const keys = (courses: CourseRef[]) => courses.map((course) => refKey(course.source, course.course_id)).sort().join();
   return keys(a) === keys(b);
 }
@@ -78,8 +78,9 @@ function Editor({ look, originalName, courses }: EditorProps) {
     const members = courses.filter((course) =>
       look.courses.some((member) => refKey(member.source, member.course_id) === refKey(course.source, course.id)),
     );
-    const usos = matchingUsosCourse(members, courses);
-    return usos ? unique([...look.courses, ...resolve(usos.source, usos.id, usos.name).courses]) : look.courses;
+    const free = courses.filter((course) => !resolve(course.source, course.id, course.name).subject);
+    const matched = sameCourses(members, free).map((course) => ({ source: course.source, course_id: course.id }));
+    return unique([...look.courses, ...matched]).slice(0, MAX_COURSES);
   });
   const [draft, setDraft] = useState<SubjectDraft>({
     name: look.subject?.name ?? '',
@@ -101,7 +102,7 @@ function Editor({ look, originalName, courses }: EditorProps) {
   const update = (patch: Partial<SubjectDraft>) => setDraft({ ...draft, ...patch });
   const fallbackName = look.subject?.name ? originalName : look.name;
   const unchanged =
-    !look.subject && !draft.name?.trim() && !draft.color && !draft.icon && sameCourses(draft.courses, initial);
+    !look.subject && !draft.name?.trim() && !draft.color && !draft.icon && sameRefs(draft.courses, initial);
 
   const save = async () => {
     if (unchanged) {

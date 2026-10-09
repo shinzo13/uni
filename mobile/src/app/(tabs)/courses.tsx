@@ -11,7 +11,7 @@ import { Segmented } from '@/components/Segmented';
 import { SourceIssues } from '@/components/SourceIssues';
 import { SubjectIcon } from '@/components/SubjectIcon';
 import { courseDetail, currentTerm, termLabel, termOf } from '@/format';
-import { editSubject, type SubjectLook, useSubjectResolver } from '@/subjects';
+import { editSubject, membersCaption, type SubjectLook, useSubjectResolver } from '@/subjects';
 import { colors, sourceNames } from '@/theme';
 
 type Scope = 'current' | 'all';
@@ -104,17 +104,11 @@ function termOfCourse(course: Course) {
 }
 
 function subtitle(entry: Entry) {
-  if (entry.courses.length === 1) {
+  if (entry.look.courses.length === 1) {
     const [course] = entry.courses;
     return [sourceNames[course.source], courseDetail(course.name)].filter(Boolean).join(' · ');
   }
-  const counts = new Map<string, number>();
-  for (const course of entry.courses) {
-    counts.set(course.source, (counts.get(course.source) ?? 0) + 1);
-  }
-  return [...counts.entries()]
-    .map(([source, count]) => `${sourceNames[source as Course['source']]}${count > 1 ? ` ×${count}` : ''}`)
-    .join(' · ');
+  return membersCaption(entry.look.courses);
 }
 
 const styles = StyleSheet.create({

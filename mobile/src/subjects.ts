@@ -65,20 +65,28 @@ function defaultName(members: CourseRef[], courses: Map<string, Course>) {
   return named[0] ? courseTitle(named[0].name) : null;
 }
 
+const GENERIC_WORDS = new Set(['zastosowaniami', 'wstęp', 'podstawy', 'elementy', 'teorii', 'oraz', 'dla']);
+
 export function similarity(a: string, b: string) {
+  const code = (name: string) => name.match(/\b\d{2}-[A-Z0-9]+-[A-Z0-9]+\b/)?.[0];
+  if (code(a) && code(a) === code(b)) {
+    return 10;
+  }
+  const tokens = (name: string) =>
+    courseTitle(name)
+      .toLowerCase()
+      .split(/[^\p{L}\d]+/u)
+      .filter(Boolean);
   const words = (name: string) =>
-    new Set(
-      courseTitle(name)
-        .toLowerCase()
-        .split(/[^\p{L}\d]+/u)
-        .filter((word) => word.length > 2 || /\d/.test(word)),
-    );
+    new Set(tokens(name).filter((word) => word.length > 2 && !/\d/.test(word) && !GENERIC_WORDS.has(word)));
+  const numbers = (name: string) => tokens(name).filter((word) => /^\d+$/.test(word)).join();
+  if (numbers(a) && numbers(b) && numbers(a) !== numbers(b)) {
+    return 0;
+  }
   const left = words(a);
   const right = words(b);
   const shared = [...left].filter((word) => right.has(word)).length;
-  const code = (name: string) => name.match(/\b\d{2}-[A-Z0-9]+-[A-Z0-9]+\b/)?.[0];
-  const sameCode = code(a) && code(a) === code(b) ? 10 : 0;
-  return shared / Math.max(1, Math.min(left.size, right.size)) + sameCode;
+  return shared / Math.max(1, Math.min(left.size, right.size));
 }
 
 const SUGGESTION_THRESHOLD = 0.5;
@@ -107,22 +115,32 @@ export function suggestMerges(members: Course[], candidates: Course[]) {
     .map((entry) => entry.course);
 }
 
-export function matchingUsosCourse(members: Course[], candidates: Course[]) {
-  if (members.some((member) => member.source === 'usos')) {
-    return null;
+export function sameCourse(member: Course, candidate: Course) {
+  if (candidate.source === 'usos' && member.name.includes(candidate.id)) {
+    return true;
   }
-  const usos = candidates.filter((course) => course.source === 'usos');
   return (
-    usos.find((course) => members.some((member) => member.name.includes(course.id))) ??
-    usos.find((course) =>
-      members.some(
-        (member) =>
-          courseTitle(member.name).toLowerCase() === courseTitle(course.name).toLowerCase() &&
-          (!courseTerm(member) || courseTerm(member) === courseTerm(course)),
-      ),
-    ) ??
-    null
+    courseTitle(member.name).toLowerCase() === courseTitle(candidate.name).toLowerCase() &&
+    !!courseTerm(member) &&
+    courseTerm(member) === courseTerm(candidate)
   );
+}
+
+export function sameCourses(members: Course[], candidates: Course[]) {
+  const matched = candidates.filter((candidate) => members.some((member) => sameCourse(member, candidate)));
+  const usos = matched.filter((course) => course.source === 'usos');
+  return members.some((member) => member.source === 'usos') || usos.length <= 1
+    ? matched
+    : matched.filter((course) => course.source !== 'usos');
+}
+
+const SOURCE_ORDER: SourceKind[] = ['usos', 'moodle', 'teams'];
+
+export function membersCaption(members: CourseRef[]) {
+  return SOURCE_ORDER.map((source) => [source, members.filter((member) => member.source === source).length] as const)
+    .filter(([, count]) => count > 0)
+    .map(([source, count]) => `${sourceNames[source]}${count > 1 ? ` ×${count}` : ''}`)
+    .join(' · ');
 }
 
 export function editSubject(source: SourceKind, courseId: string, name?: string) {

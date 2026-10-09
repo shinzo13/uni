@@ -111,6 +111,8 @@ export function termLabel(code: string | null) {
     : `Summer ${year - 1}/${String(year).slice(2)}`;
 }
 
+const CLASS_FORM = /wyk|ćw|cw\b|kcw|lab|konw|sem|lek|proj/i;
+const FORM_ABBREVIATIONS: Record<string, string> = { W: 'wykład', C: 'ćwiczenia', Ć: 'ćwiczenia', L: 'laboratorium' };
 const TEAMS_PREFIX = /^\d{4}\/(SZ|SL)\s+\S+\s+(?:([A-Z]{2,4})\s+)?/;
 
 export function courseTitle(name: string) {
@@ -127,7 +129,11 @@ export function courseDetail(name: string) {
     return kind;
   }
   const details = [...name.matchAll(/\(([^)]*)\)/g)].map((match) => match[1].trim());
-  return details.find((detail) => detail && !/\d{4}/.test(detail) && !/^[A-ZŁŚŻ]\.\s/.test(detail)) ?? null;
+  const form = details.find((detail) => CLASS_FORM.test(detail) || detail in FORM_ABBREVIATIONS);
+  if (!form || /,|\si\s/.test(form)) {
+    return null;
+  }
+  return FORM_ABBREVIATIONS[form] ?? form;
 }
 
 type LinkSegment = { text: string; url?: string };
