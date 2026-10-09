@@ -1,5 +1,5 @@
-import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useState } from 'react';
+import { router } from 'expo-router';
+import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ApiError } from '@/api/client';
@@ -15,57 +15,19 @@ const DESCRIPTIONS: Record<SourceKind, string> = {
   moodle: 'Assignments, quizzes, materials and announcements',
   teams: 'Assignments and channel posts',
 };
-const TEAMS_POLL_MS = 5000;
-const TEAMS_TIMEOUT_MS = 15 * 60_000;
-
-type TeamsLogin = { code: string; url: string };
-
 export default function SourcesScreen() {
   const { signOut } = useSession();
   const { data, isLoading } = useSources();
   const actions = useSourceActions();
   const [busy, setBusy] = useState<SourceKind | null>(null);
-  const [teams, setTeams] = useState<TeamsLogin | null>(null);
-  const { pollTeams } = actions;
-
-  useEffect(() => {
-    if (!teams) {
-      return;
-    }
-    const startedAt = Date.now();
-    const timer = setInterval(async () => {
-      try {
-        if (await pollTeams()) {
-          setTeams(null);
-          WebBrowser.dismissBrowser();
-        } else if (Date.now() - startedAt > TEAMS_TIMEOUT_MS) {
-          setTeams(null);
-        }
-      } catch {
-        setTeams(null);
-      }
-    }, TEAMS_POLL_MS);
-    return () => clearInterval(timer);
-  }, [teams, pollTeams]);
-
   const connect = async (kind: SourceKind) => {
     setBusy(kind);
     try {
       const start = await actions.start(kind);
-      if (kind === 'teams' && start.user_code) {
-        setTeams({ code: start.user_code, url: start.url });
-        await WebBrowser.openBrowserAsync(start.url);
-        return;
-      }
-      const result = await WebBrowser.openAuthSessionAsync(start.url, kind === 'usos' ? 'uni://sources/usos' : 'uni://');
-      if (result.type !== 'success') {
-        return;
-      }
-      if (kind === 'moodle') {
-        await actions.completeMoodle(result.url);
-      } else {
-        await actions.refresh();
-      }
+      router.push({
+        pathname: '/connect/[kind]',
+        params: { kind, url: start.url, ...(start.user_code ? { code: start.user_code } : {}) },
+      });
     } catch (error) {
       Alert.alert(`${sourceNames[kind]} was not connected`, error instanceof ApiError ? error.message : String(error));
     } finally {
@@ -94,21 +56,6 @@ export default function SourcesScreen() {
           onDisconnect={() => disconnect(source.kind)}
         />
       ))}
-      {teams ? (
-        <View style={styles.card}>
-          <Text style={text.title}>Teams sign-in code</Text>
-          <Text selectable style={styles.code}>
-            {teams.code}
-          </Text>
-          <Text style={text.caption}>
-            Enter this code on the Microsoft page and sign in with your university account. This screen updates by
-            itself.
-          </Text>
-          <Pressable onPress={() => WebBrowser.openBrowserAsync(teams.url)}>
-            <Text style={styles.action}>Open sign-in page</Text>
-          </Pressable>
-        </View>
-      ) : null}
       <Pressable onPress={signOut} style={styles.signOut}>
         <Text style={[styles.action, { color: colors.danger }]}>Sign out</Text>
       </Pressable>
@@ -158,6 +105,5 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   actions: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.sm },
   action: { ...text.body, fontWeight: '600' },
-  code: { fontSize: 28, fontWeight: '700', letterSpacing: 4, color: colors.text, marginVertical: spacing.sm },
   signOut: { alignItems: 'center', padding: spacing.md },
 });
