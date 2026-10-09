@@ -158,7 +158,7 @@ function Editor({ look, originalName, courses }: EditorProps) {
       />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.preview}>
-          <SubjectIcon icon={draft.icon} color={draft.color} size={64} />
+          <SubjectIcon icon={draft.icon ?? look.glyph} color={draft.color ?? look.tint} size={64} />
           <Text style={styles.previewName} numberOfLines={2}>
             {draft.name?.trim() || fallbackName}
           </Text>

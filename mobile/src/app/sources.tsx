@@ -6,6 +6,7 @@ import { ApiError } from '@/api/client';
 import { useSourceActions, useSources } from '@/api/queries';
 import type { SourceKind, SourceStatus } from '@/api/types';
 import { Loading } from '@/components/Loading';
+import { CourseLayoutOptions, CourseListLayoutOptions } from '@/design/LayoutPicker';
 import { formatShortDate } from '@/format';
 import { useSession } from '@/session/SessionProvider';
 import { colors, sourceNames, spacing, text } from '@/theme';
@@ -56,6 +57,9 @@ export default function SourcesScreen() {
           onDisconnect={() => disconnect(source.kind)}
         />
       ))}
+      <Text style={[text.title, styles.heading]}>Appearance</Text>
+      <CourseListLayoutOptions />
+      <CourseLayoutOptions />
       <Pressable onPress={signOut} style={styles.signOut}>
         <Text style={[styles.action, { color: colors.danger }]}>Sign out</Text>
       </Pressable>
@@ -105,5 +109,6 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   actions: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.sm },
   action: { ...text.body, fontWeight: '600' },
+  heading: { marginTop: spacing.md },
   signOut: { alignItems: 'center', padding: spacing.md },
 });

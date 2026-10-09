@@ -17,6 +17,7 @@ type CourseGrades = {
   key: string;
   name: string;
   look: SubjectLook | null;
+  badge: SubjectLook;
   term: string | null;
   summary: string | null;
   grades: Grade[];
@@ -88,7 +89,7 @@ function CourseBlock({ course, expanded, onToggle }: BlockProps) {
         }}
         style={({ pressed }) => [styles.courseHeader, pressed && styles.pressed]}
       >
-        <SubjectIcon icon={course.look?.icon ?? null} color={course.look?.color ?? null} />
+        <SubjectIcon icon={course.badge.glyph} color={course.badge.tint} />
         <View style={styles.courseMain}>
           <Text style={text.body} numberOfLines={2}>
             {course.name}
@@ -166,6 +167,7 @@ function groupByCourse(all: Grade[], category: GradeCategory, resolve: Resolve):
       key,
       name: look?.name ?? courseTitle(grade.course_name),
       look,
+      badge: look ?? own,
       term: grade.term ?? termOf(grade.course_name),
       summary: null,
       grades: [],

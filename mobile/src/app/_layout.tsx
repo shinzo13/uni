@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { ApiError } from '@/api/client';
+import { DesignProvider } from '@/design/DesignProvider';
 import { SessionProvider, useSession } from '@/session/SessionProvider';
 import { colors } from '@/theme';
 
@@ -22,8 +23,10 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
-        <StatusBar style="dark" />
-        <RootNavigator />
+        <DesignProvider>
+          <StatusBar style="dark" />
+          <RootNavigator />
+        </DesignProvider>
       </SessionProvider>
     </QueryClientProvider>
   );

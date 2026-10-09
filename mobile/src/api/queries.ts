@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
 import { request } from '@/api/client';
@@ -130,4 +130,76 @@ export function useSubjectActions() {
       remove: (id: string) => request<void>(`/subjects/${id}`, { method: 'DELETE', token }).then(invalidate),
     };
   }, [queryClient, token]);
+}
+
+function sectionsPath(courseId: string) {
+  return `/courses/moodle/${encodeURIComponent(courseId)}/sections`;
+}
+
+export function useMoodleSections(courseIds: string[]) {
+  const { token } = useSession();
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+  const results = useQueries({
+    queries: courseIds.map((courseId) => ({
+      queryKey: ['sections', 'moodle', courseId, {}],
+      queryFn: () => request<Page<CourseSection>>(sectionsPath(courseId), { token }),
+      enabled: !!token,
+    })),
+  });
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all(
+        courseIds.map(async (courseId) =>
+          queryClient.setQueryData(
+            ['sections', 'moodle', courseId, {}],
+            await request<Page<CourseSection>>(sectionsPath(courseId), { token, params: { refresh: true } }),
+          ),
+        ),
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  };
+  return {
+    pages: results.map((result) => result.data),
+    isLoading: results.some((result) => result.isLoading),
+    refresh,
+    refreshing,
+  };
+}
+
+export function useCompletion() {
+  const { token } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ courseId, itemId, completed }: { courseId: string; itemId: string; completed: boolean }) =>
+      request<void>(`/courses/moodle/${encodeURIComponent(courseId)}/items/${encodeURIComponent(itemId)}/completion`, {
+        method: 'POST',
+        token,
+        body: { completed },
+      }),
+    onMutate: ({ courseId, itemId, completed }) => {
+      const key = ['sections', 'moodle', courseId, {}];
+      const previous = queryClient.getQueryData<Page<CourseSection>>(key);
+      if (previous) {
+        queryClient.setQueryData<Page<CourseSection>>(key, {
+          ...previous,
+          items: previous.items.map((section) => ({
+            ...section,
+            items: section.items.map((item) =>
+              item.id === itemId ? { ...item, completion: completed ? 'complete' : 'incomplete' } : item,
+            ),
+          })),
+        });
+      }
+      return { key, previous };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(context.key, context.previous);
+      }
+    },
+  });
 }

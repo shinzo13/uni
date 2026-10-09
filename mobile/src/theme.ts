@@ -57,3 +57,21 @@ export const subjectPalette = [
   '#37474F',
   '#111111',
 ];
+
+export const type = {
+  display: { fontSize: 32, lineHeight: 38, fontWeight: '700' as const, color: colors.text },
+  headline: { fontSize: 24, lineHeight: 30, fontWeight: '700' as const, color: colors.text },
+  titleLarge: { fontSize: 20, lineHeight: 26, fontWeight: '600' as const, color: colors.text },
+  title: { fontSize: 16, lineHeight: 22, fontWeight: '600' as const, color: colors.text },
+  body: { fontSize: 15, lineHeight: 21, color: colors.text },
+  label: { fontSize: 12, lineHeight: 16, fontWeight: '600' as const, letterSpacing: 0.4, color: colors.muted },
+  caption: { fontSize: 13, lineHeight: 18, color: colors.muted },
+};
+
+export const radii = { sm: 8, md: 12, lg: 20, pill: 999 };
+
+export function tinted(color: string, alpha: number) {
+  return `${color}${Math.round(alpha * 255)
+    .toString(16)
+    .padStart(2, '0')}`;
+}

@@ -88,7 +88,7 @@ function AssignmentRow({ assignment, current, resolve }: RowProps) {
       title={assignment.title}
       subtitle={subtitle}
       detail={due}
-      leading={<SubjectIcon icon={look.icon} color={look.color} size={32} />}
+      leading={<SubjectIcon icon={look.glyph} color={look.tint} size={32} />}
       onPress={() =>
         router.push({ pathname: '/assignment/[id]', params: { id: assignment.id, source: assignment.source } })
       }

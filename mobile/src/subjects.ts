@@ -4,13 +4,15 @@ import { useMemo } from 'react';
 import { useCourses, useSubjects } from '@/api/queries';
 import type { Course, CourseRef, SourceKind, Subject } from '@/api/types';
 import { courseDetail, courseTitle, termLabel, termOf } from '@/format';
-import { sourceNames } from '@/theme';
+import { sourceNames, subjectPalette } from '@/theme';
 
 export type SubjectLook = {
   key: string;
   name: string;
   color: string | null;
   icon: string | null;
+  tint: string;
+  glyph: string;
   subject: Subject | null;
   courses: CourseRef[];
 };
@@ -45,11 +47,14 @@ export function useSubjectResolver(): Resolve {
       const key = refKey(source, courseId);
       const subject = index.get(key) ?? null;
       const members = subject?.courses ?? [{ source, course_id: courseId }];
+      const original = defaultName(members, courses) || courseTitle(fallbackName ?? courseId);
       return {
         key: subject ? subject.id : key,
-        name: subject?.name || defaultName(members, courses) || courseTitle(fallbackName ?? courseId),
+        name: subject?.name || original,
         color: subject?.color ?? null,
         icon: subject?.icon ?? null,
+        tint: subject?.color ?? autoTint(original),
+        glyph: subject?.icon ?? autoGlyph(original),
         subject,
         courses: members,
       };
@@ -151,4 +156,37 @@ export function courseCaption(course: Course) {
   return [sourceNames[course.source], courseDetail(course.name), termLabel(courseTerm(course))]
     .filter(Boolean)
     .join(' · ');
+}
+
+const GLYPH_HINTS: [RegExp, string][] = [
+  [/analiz|calculus|rachunek różn/i, 'function-variant'],
+  [/algebr|macierz|matrix/i, 'matrix'],
+  [/prawdopodob|statyst|probab/i, 'dice-multiple-outline'],
+  [/dyskretn|graf|logik|mnogo/i, 'vector-polyline'],
+  [/liczb|arytm/i, 'numeric'],
+  [/bazy danych|database|sql/i, 'database-outline'],
+  [/sieci|network/i, 'lan'],
+  [/systemy operac|operating/i, 'cog-outline'],
+  [/internet|web|html/i, 'web'],
+  [/algorytm|struktur/i, 'sitemap-outline'],
+  [/programow|paradygmat|code|warsztat/i, 'code-braces'],
+  [/informaty|komputer/i, 'laptop'],
+  [/angiel|język|lektorat|english|polsk/i, 'translate'],
+  [/fizyk|physic/i, 'atom'],
+  [/siłown|wf|sport|wychowanie fiz/i, 'dumbbell'],
+  [/bhp|bezpiecze/i, 'shield-check-outline'],
+  [/egzamin|exam/i, 'clipboard-text-outline'],
+  [/matematy|math/i, 'math-compass'],
+];
+
+export function autoGlyph(name: string) {
+  return GLYPH_HINTS.find(([pattern]) => pattern.test(name))?.[1] ?? 'book-open-variant';
+}
+
+export function autoTint(name: string) {
+  let hash = 0;
+  for (const char of courseTitle(name).toLowerCase()) {
+    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  }
+  return subjectPalette[hash % (subjectPalette.length - 1)];
 }

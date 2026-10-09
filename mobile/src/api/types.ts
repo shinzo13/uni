@@ -77,6 +77,9 @@ export type CourseItem = {
   url: string | null;
   html: string;
   attachments: Attachment[];
+  modified_at: string | null;
+  completion: 'untracked' | 'incomplete' | 'complete';
+  manual_completion: boolean;
 };
 
 export type CourseSection = {
