@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 
 from uni.api.deps import SubjectsDep
 from uni.api.schemas import SubjectIn, SubjectOut
@@ -16,7 +17,10 @@ async def list_subjects(subjects: SubjectsDep) -> list[SubjectOut]:
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_subject(body: SubjectIn, subjects: SubjectsDep) -> SubjectOut:
-    return SubjectOut.of(await subjects.create(body.data()))
+    try:
+        return SubjectOut.of(await subjects.create(body.data()))
+    except IntegrityError as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, "subjects changed concurrently") from error
 
 
 @router.put("/{subject_id}")
@@ -25,6 +29,8 @@ async def update_subject(subject_id: uuid.UUID, body: SubjectIn, subjects: Subje
         return SubjectOut.of(await subjects.update(subject_id, body.data()))
     except SubjectNotFound as error:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "subject not found") from error
+    except IntegrityError as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, "subjects changed concurrently") from error
 
 
 @router.delete("/{subject_id}", status_code=status.HTTP_204_NO_CONTENT)

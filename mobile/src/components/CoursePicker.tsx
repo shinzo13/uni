@@ -4,7 +4,7 @@ import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'r
 import type { Course, CourseRef } from '@/api/types';
 import { Row, SectionHeader } from '@/components/Row';
 import { courseTitle, termLabel, termOf } from '@/format';
-import { refKey, similarity } from '@/subjects';
+import { refKey, similarity, type SubjectLook, useSubjectResolver } from '@/subjects';
 import { colors, sourceNames, spacing, text } from '@/theme';
 
 const SUGGESTION_THRESHOLD = 0.5;
@@ -14,12 +14,13 @@ type Props = {
   visible: boolean;
   courses: Course[];
   selected: CourseRef[];
-  onPick: (course: Course) => void;
+  onPick: (courses: CourseRef[]) => void;
   onClose: () => void;
 };
 
 export function CoursePicker({ visible, courses, selected, onPick, onClose }: Props) {
   const [query, setQuery] = useState('');
+  const resolve = useSubjectResolver();
   const { suggested, rest } = useMemo(() => {
     const taken = new Set(selected.map((course) => refKey(course.source, course.course_id)));
     const members = courses.filter((course) => taken.has(refKey(course.source, course.id)));
@@ -73,9 +74,9 @@ export function CoursePicker({ visible, courses, selected, onPick, onClose }: Pr
             ) : (
               <Row
                 title={courseTitle(item.name)}
-                subtitle={[sourceNames[item.source], termLabel(item.term ?? termOf(item.name))].join(' · ')}
+                subtitle={subtitle(item, resolve(item.source, item.id, item.name))}
                 onPress={() => {
-                  onPick(item);
+                  onPick(resolve(item.source, item.id, item.name).courses);
                   setQuery('');
                   onClose();
                 }}
@@ -87,6 +88,16 @@ export function CoursePicker({ visible, courses, selected, onPick, onClose }: Pr
       </View>
     </Modal>
   );
+}
+
+function subtitle(course: Course, look: SubjectLook) {
+  const parts = [sourceNames[course.source], termLabel(course.term ?? termOf(course.name))];
+  if (look.subject && look.courses.length > 1) {
+    parts.push(`in ${look.name} with ${look.courses.length - 1} more`);
+  } else if (look.subject?.name) {
+    parts.push(`alias ${look.name}`);
+  }
+  return parts.join(' · ');
 }
 
 const styles = StyleSheet.create({

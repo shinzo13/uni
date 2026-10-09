@@ -37,7 +37,7 @@ export default function CourseScreen() {
   const { kind, id, name } = useLocalSearchParams<{ kind: SourceKind; id: string; name?: string }>();
   const resolve = useSubjectResolver();
   const index = useCourseIndex();
-  const look = resolve(kind, id, name);
+  const look = useMemo(() => resolve(kind, id, name), [resolve, kind, id, name]);
   const moodle = look.courses.filter((course) => course.source === 'moodle');
   const [tab, setTab] = useState<Tab>(moodle.length ? 'materials' : 'posts');
   const [picked, setPicked] = useState<string | null>(null);

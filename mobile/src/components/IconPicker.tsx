@@ -85,11 +85,11 @@ export function IconPicker({ visible, color, value, onChange, onClose }: Props) 
           data={icons}
           numColumns={columns}
           keyExtractor={(name) => name}
-          initialNumToRender={60}
+          initialNumToRender={12}
           windowSize={5}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.grid}
-          getItemLayout={(_, index) => ({ length: CELL, offset: CELL * Math.floor(index / columns), index })}
+          getItemLayout={(_, index) => ({ length: CELL, offset: CELL * index, index })}
           renderItem={({ item }) => {
             const selected = item === value;
             return (

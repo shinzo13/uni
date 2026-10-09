@@ -164,7 +164,7 @@ function groupByCourse(grades: Grade[], category: GradeCategory, resolve: Resolv
   for (const grade of grades) {
     const own = resolve(grade.source, grade.course_id, grade.course_name);
     const look = own.subject ? own : (subjectOfName.get(nameKey(grade)) ?? null);
-    const key = look ? `${grade.term ?? termOf(grade.course_name) ?? ''}:${look.key}` : nameKey(grade);
+    const key = look ? look.key : nameKey(grade);
     const course = courses.get(key) ?? {
       key,
       name: look?.name ?? courseTitle(grade.course_name),
@@ -173,6 +173,7 @@ function groupByCourse(grades: Grade[], category: GradeCategory, resolve: Resolv
       summary: null,
       grades: [],
     };
+    course.term = [course.term, grade.term ?? termOf(grade.course_name)].filter(Boolean).sort().pop() ?? null;
     if (grade.source === 'usos' && !look) {
       course.name = courseTitle(grade.course_name);
     }
