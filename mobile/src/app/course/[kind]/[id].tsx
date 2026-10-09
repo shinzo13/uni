@@ -10,7 +10,9 @@ import { Attachments } from '@/components/Attachments';
 import { EmptyState } from '@/components/EmptyState';
 import { Loading } from '@/components/Loading';
 import { Row, SectionHeader } from '@/components/Row';
+import { LinkedText } from '@/components/LinkedText';
 import { Segmented } from '@/components/Segmented';
+import { SubjectIcon } from '@/components/SubjectIcon';
 import { courseTitle, formatDateTime, plainText } from '@/format';
 import { editSubject, refKey, useCourseIndex, useSubjectResolver } from '@/subjects';
 import { colors, spacing, text } from '@/theme';
@@ -41,6 +43,7 @@ export default function CourseScreen() {
   const moodle = look.courses.filter((course) => course.source === 'moodle');
   const [tab, setTab] = useState<Tab>(moodle.length ? 'materials' : 'posts');
   const [picked, setPicked] = useState<string | null>(null);
+  usePosts();
   const shown = moodle.find((course) => course.course_id === picked) ?? moodle[0];
 
   return (
@@ -48,6 +51,14 @@ export default function CourseScreen() {
       <Stack.Screen
         options={{
           title: look.name,
+          headerTitle: () => (
+            <View style={styles.headerTitle}>
+              <SubjectIcon icon={look.icon} color={look.color} size={28} />
+              <Text style={text.title} numberOfLines={1}>
+                {look.name}
+              </Text>
+            </View>
+          ),
           headerRight: () => (
             <Pressable accessibilityLabel="Edit subject" hitSlop={12} onPress={() => editSubject(kind, id, name)}>
               <Ionicons name="color-palette-outline" size={22} color={colors.text} />
@@ -194,16 +205,12 @@ function PostCard({ post }: { post: Post }) {
         {[post.author, formatDateTime(post.posted_at)].filter(Boolean).join(' · ')}
       </Text>
       {post.title ? <Text style={text.title}>{post.title}</Text> : null}
-      <Text selectable style={text.body}>
-        {plainText(post.body_html)}
-      </Text>
+      <LinkedText html={post.body_html} />
       <Attachments source={post.source} attachments={post.attachments} />
       {post.replies.map((reply) => (
         <View key={reply.id} style={styles.reply}>
           <Text style={text.caption}>{[reply.author, formatDateTime(reply.posted_at)].filter(Boolean).join(' · ')}</Text>
-          <Text selectable style={text.body}>
-            {plainText(reply.body_html)}
-          </Text>
+          <LinkedText html={reply.body_html} />
         </View>
       ))}
     </View>
@@ -212,6 +219,7 @@ function PostCard({ post }: { post: Post }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  headerTitle: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 },
   chips: { flexGrow: 0 },
   chipRow: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm },
   chip: {

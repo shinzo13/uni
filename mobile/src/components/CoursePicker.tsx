@@ -3,12 +3,9 @@ import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'r
 
 import type { Course, CourseRef } from '@/api/types';
 import { Row, SectionHeader } from '@/components/Row';
-import { courseTitle, termLabel, termOf } from '@/format';
-import { refKey, similarity, type SubjectLook, useSubjectResolver } from '@/subjects';
-import { colors, sourceNames, spacing, text } from '@/theme';
-
-const SUGGESTION_THRESHOLD = 0.5;
-const SUGGESTIONS = 6;
+import { courseTitle } from '@/format';
+import { courseCaption, refKey, type SubjectLook, suggestMerges, useSubjectResolver } from '@/subjects';
+import { colors, spacing, text } from '@/theme';
 
 type Props = {
   visible: boolean;
@@ -28,19 +25,16 @@ export function CoursePicker({ visible, courses, selected, onPick, onClose }: Pr
     const candidates = courses
       .filter((course) => !taken.has(refKey(course.source, course.id)))
       .filter((course) => words.every((word) => `${course.name} ${course.id}`.toLowerCase().includes(word)));
-    const score = (course: Course) =>
-      Math.max(0, ...members.map((member) => similarity(`${member.id} ${member.name}`, `${course.id} ${course.name}`)));
-    const ranked = candidates
-      .map((course) => ({ course, score: score(course) }))
-      .filter((entry) => entry.score >= SUGGESTION_THRESHOLD)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, SUGGESTIONS)
-      .map((entry) => entry.course);
+    const ranked = suggestMerges(members, candidates);
     return {
       suggested: ranked,
       rest: candidates.filter((course) => !ranked.includes(course)).sort((a, b) => a.name.localeCompare(b.name)),
     };
   }, [courses, selected, query]);
+  const close = () => {
+    setQuery('');
+    onClose();
+  };
 
   const data = [
     ...(suggested.length ? [{ header: 'Suggested' }, ...suggested] : []),
@@ -48,11 +42,11 @@ export function CoursePicker({ visible, courses, selected, onPick, onClose }: Pr
   ];
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={close}>
       <View style={styles.sheet}>
         <View style={styles.header}>
           <Text style={text.title}>Merge with</Text>
-          <Pressable onPress={onClose} hitSlop={12}>
+          <Pressable onPress={close} hitSlop={12}>
             <Text style={styles.done}>Cancel</Text>
           </Pressable>
         </View>
@@ -77,8 +71,7 @@ export function CoursePicker({ visible, courses, selected, onPick, onClose }: Pr
                 subtitle={subtitle(item, resolve(item.source, item.id, item.name))}
                 onPress={() => {
                   onPick(resolve(item.source, item.id, item.name).courses);
-                  setQuery('');
-                  onClose();
+                  close();
                 }}
               />
             )
@@ -91,7 +84,7 @@ export function CoursePicker({ visible, courses, selected, onPick, onClose }: Pr
 }
 
 function subtitle(course: Course, look: SubjectLook) {
-  const parts = [sourceNames[course.source], termLabel(course.term ?? termOf(course.name))];
+  const parts = [courseCaption(course)];
   if (look.subject && look.courses.length > 1) {
     parts.push(`in ${look.name} with ${look.courses.length - 1} more`);
   } else if (look.subject?.name) {

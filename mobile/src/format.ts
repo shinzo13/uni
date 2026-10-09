@@ -111,9 +111,47 @@ export function termLabel(code: string | null) {
     : `Summer ${year - 1}/${String(year).slice(2)}`;
 }
 
+const TEAMS_PREFIX = /^\d{4}\/(SZ|SL)\s+\S+\s+(?:([A-Z]{2,4})\s+)?/;
+
 export function courseTitle(name: string) {
   return name
-    .replace(/^\d{4}\/(SZ|SL)\s+\S+\s+/, '')
+    .replace(TEAMS_PREFIX, '')
+    .replace(/\s+-\s+(Grupa\s+)?\d+$/i, '')
     .replace(/\s*\([^)]*\)/g, '')
     .trim();
+}
+
+export function courseDetail(name: string) {
+  const kind = name.match(TEAMS_PREFIX)?.[2];
+  if (kind) {
+    return kind;
+  }
+  const details = [...name.matchAll(/\(([^)]*)\)/g)].map((match) => match[1].trim());
+  return details.find((detail) => detail && !/\d{4}/.test(detail) && !/^[A-ZŁŚŻ]\.\s/.test(detail)) ?? null;
+}
+
+type LinkSegment = { text: string; url?: string };
+
+const ANCHOR = /<a\b[^>]*?href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+const TOKENS = /\u0001([^\u0002]*)\u0002([^\u0003]*)\u0003|(https?:\/\/[^\s<>"]+[^\s<>".,;:!?)])/g;
+
+export function linkSegments(html: string): LinkSegment[] {
+  const marked = html.replace(
+    ANCHOR,
+    (_, href: string, label: string) => `\u0001${href.replace(/&amp;/g, '&')}\u0002${plainText(label) || href}\u0003`,
+  );
+  const body = plainText(marked);
+  const result: LinkSegment[] = [];
+  let last = 0;
+  for (const match of body.matchAll(TOKENS)) {
+    if (match.index > last) {
+      result.push({ text: body.slice(last, match.index) });
+    }
+    result.push(match[3] ? { text: match[3], url: match[3] } : { text: match[2], url: match[1] });
+    last = match.index + match[0].length;
+  }
+  if (last < body.length) {
+    result.push({ text: body.slice(last) });
+  }
+  return result;
 }

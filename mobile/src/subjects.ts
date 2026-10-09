@@ -3,7 +3,8 @@ import { useMemo } from 'react';
 
 import { useCourses, useSubjects } from '@/api/queries';
 import type { Course, CourseRef, SourceKind, Subject } from '@/api/types';
-import { courseTitle } from '@/format';
+import { courseDetail, courseTitle, termLabel, termOf } from '@/format';
+import { sourceNames } from '@/theme';
 
 export type SubjectLook = {
   key: string;
@@ -80,6 +81,56 @@ export function similarity(a: string, b: string) {
   return shared / Math.max(1, Math.min(left.size, right.size)) + sameCode;
 }
 
+const SUGGESTION_THRESHOLD = 0.5;
+const SUGGESTIONS = 6;
+
+export function courseTerm(course: Course) {
+  return course.term ?? termOf(course.name);
+}
+
+function score(members: Course[], candidate: Course) {
+  return Math.max(
+    0,
+    ...members.map((member) => {
+      const sameTerm = !courseTerm(member) || !courseTerm(candidate) || courseTerm(member) === courseTerm(candidate);
+      return sameTerm ? similarity(`${member.id} ${member.name}`, `${candidate.id} ${candidate.name}`) : 0;
+    }),
+  );
+}
+
+export function suggestMerges(members: Course[], candidates: Course[]) {
+  return candidates
+    .map((course) => ({ course, score: score(members, course) }))
+    .filter((entry) => entry.score >= SUGGESTION_THRESHOLD)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, SUGGESTIONS)
+    .map((entry) => entry.course);
+}
+
+export function matchingUsosCourse(members: Course[], candidates: Course[]) {
+  if (members.some((member) => member.source === 'usos')) {
+    return null;
+  }
+  const usos = candidates.filter((course) => course.source === 'usos');
+  return (
+    usos.find((course) => members.some((member) => member.name.includes(course.id))) ??
+    usos.find((course) =>
+      members.some(
+        (member) =>
+          courseTitle(member.name).toLowerCase() === courseTitle(course.name).toLowerCase() &&
+          (!courseTerm(member) || courseTerm(member) === courseTerm(course)),
+      ),
+    ) ??
+    null
+  );
+}
+
 export function editSubject(source: SourceKind, courseId: string, name?: string) {
   router.push({ pathname: '/subject/edit', params: { source, course: courseId, name } });
+}
+
+export function courseCaption(course: Course) {
+  return [sourceNames[course.source], courseDetail(course.name), termLabel(courseTerm(course))]
+    .filter(Boolean)
+    .join(' · ');
 }

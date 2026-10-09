@@ -12,11 +12,25 @@ import { IconPicker } from '@/components/IconPicker';
 import { EmptyState } from '@/components/EmptyState';
 import { Loading } from '@/components/Loading';
 import { DEFAULT_ICON, isIconName, SubjectIcon } from '@/components/SubjectIcon';
-import { courseTitle, termLabel, termOf } from '@/format';
-import { refKey, type SubjectLook, useCourseIndex, useSubjectResolver } from '@/subjects';
+import { courseTitle } from '@/format';
+import {
+  courseCaption,
+  matchingUsosCourse,
+  refKey,
+  type SubjectLook,
+  suggestMerges,
+  useCourseIndex,
+  useSubjectResolver,
+} from '@/subjects';
 import { colors, sourceNames, spacing, text } from '@/theme';
 
 const MAX_COURSES = 20;
+const INLINE_SUGGESTIONS = 3;
+
+function sameCourses(a: CourseRef[], b: CourseRef[]) {
+  const keys = (courses: CourseRef[]) => courses.map((course) => refKey(course.source, course.course_id)).sort().join();
+  return keys(a) === keys(b);
+}
 
 function unique(courses: CourseRef[]) {
   return [...new Map(courses.map((course) => [refKey(course.source, course.course_id), course])).values()];
@@ -55,19 +69,39 @@ type EditorProps = {
 
 function Editor({ look, originalName, courses }: EditorProps) {
   const index = useCourseIndex();
+  const resolve = useSubjectResolver();
   const actions = useSubjectActions();
+  const [initial] = useState(() => {
+    if (look.subject) {
+      return look.courses;
+    }
+    const members = courses.filter((course) =>
+      look.courses.some((member) => refKey(member.source, member.course_id) === refKey(course.source, course.id)),
+    );
+    const usos = matchingUsosCourse(members, courses);
+    return usos ? unique([...look.courses, ...resolve(usos.source, usos.id, usos.name).courses]) : look.courses;
+  });
   const [draft, setDraft] = useState<SubjectDraft>({
     name: look.subject?.name ?? '',
     color: look.color,
     icon: look.icon,
-    courses: look.courses,
+    courses: initial,
   });
+  const taken = new Set(draft.courses.map((member) => refKey(member.source, member.course_id)));
+  const members = courses.filter((course) => taken.has(refKey(course.source, course.id)));
+  const suggestions = suggestMerges(
+    members,
+    courses.filter((course) => !taken.has(refKey(course.source, course.id))),
+  ).slice(0, INLINE_SUGGESTIONS);
+  const merge = (picked: CourseRef[]) =>
+    update({ courses: unique([...draft.courses, ...picked]).slice(0, MAX_COURSES) });
   const [picking, setPicking] = useState<'icon' | 'course' | null>(null);
   const [saving, setSaving] = useState(false);
 
   const update = (patch: Partial<SubjectDraft>) => setDraft({ ...draft, ...patch });
   const fallbackName = look.subject?.name ? originalName : look.name;
-  const unchanged = !look.subject && !draft.name?.trim() && !draft.color && !draft.icon && draft.courses.length === 1;
+  const unchanged =
+    !look.subject && !draft.name?.trim() && !draft.color && !draft.icon && sameCourses(draft.courses, initial);
 
   const save = async () => {
     if (unchanged) {
@@ -173,11 +207,7 @@ function Editor({ look, originalName, courses }: EditorProps) {
                   <Text style={text.body} numberOfLines={2}>
                     {known ? courseTitle(known.name) : member.course_id}
                   </Text>
-                  <Text style={text.caption}>
-                    {[sourceNames[member.source], known ? termLabel(known.term ?? termOf(known.name)) : null]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </Text>
+                  <Text style={text.caption}>{known ? courseCaption(known) : sourceNames[member.source]}</Text>
                 </View>
                 {draft.courses.length > 1 ? (
                   <Pressable accessibilityLabel="Remove from subject" onPress={() => removeCourse(member)} hitSlop={8}>
@@ -197,6 +227,29 @@ function Editor({ look, originalName, courses }: EditorProps) {
             </Pressable>
           ) : null}
         </View>
+        {suggestions.length && draft.courses.length < MAX_COURSES ? (
+          <>
+            <Text style={text.section}>Suggested</Text>
+            <View style={styles.card}>
+              {suggestions.map((course) => (
+                <Pressable
+                  key={refKey(course.source, course.id)}
+                  accessibilityLabel={`Merge ${course.name}`}
+                  onPress={() => merge(resolve(course.source, course.id, course.name).courses)}
+                  style={({ pressed }) => [styles.member, pressed && styles.pressed]}
+                >
+                  <View style={styles.grow}>
+                    <Text style={text.body} numberOfLines={2}>
+                      {courseTitle(course.name)}
+                    </Text>
+                    <Text style={text.caption}>{courseCaption(course)}</Text>
+                  </View>
+                  <Ionicons name="add-circle-outline" size={22} color={colors.success} />
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : null}
         <Text style={text.caption}>
           Merged courses share one name, color and icon everywhere: schedule, assignments, materials and grades.
         </Text>
@@ -219,11 +272,7 @@ function Editor({ look, originalName, courses }: EditorProps) {
         visible={picking === 'course'}
         courses={courses}
         selected={draft.courses}
-        onPick={(picked) =>
-          update({
-            courses: unique([...draft.courses, ...picked]).slice(0, MAX_COURSES),
-          })
-        }
+        onPick={merge}
         onClose={() => setPicking(null)}
       />
     </>

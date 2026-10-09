@@ -12,7 +12,7 @@ type Props = {
 };
 
 export function ColorPicker({ value, onChange }: Props) {
-  const [custom, setCustom] = useState(value && !subjectPalette.includes(value) ? value : '');
+  const [custom, setCustom] = useState(value ?? '');
   const submitCustom = (input: string) => {
     const hex = input.startsWith('#') ? input : `#${input}`;
     setCustom(input);
@@ -39,7 +39,7 @@ export function ColorPicker({ value, onChange }: Props) {
             key={color}
             accessibilityLabel={color}
             onPress={() => {
-              setCustom('');
+              setCustom(color);
               onChange(color);
             }}
             style={[styles.swatch, { backgroundColor: color }, value === color && styles.selected]}

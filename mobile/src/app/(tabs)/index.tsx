@@ -247,8 +247,8 @@ function toBlocks(date: string, classes: ClassSession[], exams: Exam[], resolve:
   };
   const lessons = classes
     .filter((item) => isoDate(new Date(item.starts_at)) === date)
-    .map((item) => ({
-      key: `class-${item.course_id}-${item.starts_at}`,
+    .map((item, index) => ({
+      key: `class-${item.course_id}-${item.starts_at}-${index}`,
       ...subject(item.source, item.course_id, item.course_name, item.kind_code ?? abbreviation(item.kind)),
       startsAt: new Date(item.starts_at),
       endsAt: new Date(item.ends_at),

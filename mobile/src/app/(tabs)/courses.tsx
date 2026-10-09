@@ -10,7 +10,7 @@ import { Row, SectionHeader } from '@/components/Row';
 import { Segmented } from '@/components/Segmented';
 import { SourceIssues } from '@/components/SourceIssues';
 import { SubjectIcon } from '@/components/SubjectIcon';
-import { currentTerm, termLabel, termOf } from '@/format';
+import { courseDetail, currentTerm, termLabel, termOf } from '@/format';
 import { editSubject, type SubjectLook, useSubjectResolver } from '@/subjects';
 import { colors, sourceNames } from '@/theme';
 
@@ -104,6 +104,10 @@ function termOfCourse(course: Course) {
 }
 
 function subtitle(entry: Entry) {
+  if (entry.courses.length === 1) {
+    const [course] = entry.courses;
+    return [sourceNames[course.source], courseDetail(course.name)].filter(Boolean).join(' · ');
+  }
   const counts = new Map<string, number>();
   for (const course of entry.courses) {
     counts.set(course.source, (counts.get(course.source) ?? 0) + 1);

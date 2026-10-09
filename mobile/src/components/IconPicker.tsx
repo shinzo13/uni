@@ -50,8 +50,12 @@ type Props = {
   onClose: () => void;
 };
 
-export function IconPicker({ visible, color, value, onChange, onClose }: Props) {
+export function IconPicker({ visible, color, value, onChange, onClose: dismiss }: Props) {
   const [query, setQuery] = useState('');
+  const onClose = () => {
+    setQuery('');
+    dismiss();
+  };
   const { width } = useWindowDimensions();
   const columns = Math.max(4, Math.floor((width - spacing.md * 2) / CELL));
   const icons = useMemo(() => {
@@ -59,7 +63,12 @@ export function IconPicker({ visible, color, value, onChange, onClose }: Props) 
     if (words.length === 0) {
       return [...SUGGESTED, ...ALL.filter((name) => !SUGGESTED.includes(name))];
     }
-    return ALL.filter((name) => words.every((word) => name.includes(word)));
+    const joined = words.join('-');
+    const rank = (name: string) =>
+      name === joined ? 0 : name.startsWith(joined) ? 1 : name.split('-').some((part) => part.startsWith(words[0])) ? 2 : 3;
+    return ALL.filter((name) => words.every((word) => name.includes(word))).sort(
+      (a, b) => rank(a) - rank(b) || a.length - b.length || a.localeCompare(b),
+    );
   }, [query]);
 
   return (

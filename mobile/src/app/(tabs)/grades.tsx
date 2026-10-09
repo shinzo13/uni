@@ -36,11 +36,7 @@ export default function GradesScreen() {
   const sections = useMemo(
     () =>
       byTerm(
-        groupByCourse(
-          (grades.data?.items ?? []).filter((grade) => grade.category === category),
-          category,
-          resolve,
-        ),
+        groupByCourse(grades.data?.items ?? [], category, resolve),
       ),
     [grades.data, category, resolve],
   );
@@ -151,15 +147,16 @@ function summarize(grades: Grade[], category: GradeCategory) {
   return `${Number(total.toFixed(2))} / ${Number(max.toFixed(2))}`;
 }
 
-function groupByCourse(grades: Grade[], category: GradeCategory, resolve: Resolve): CourseGrades[] {
+function groupByCourse(all: Grade[], category: GradeCategory, resolve: Resolve): CourseGrades[] {
   const nameKey = (grade: Grade) => `${grade.term ?? termOf(grade.course_name) ?? ''}:${courseKey(grade.course_name)}`;
   const subjectOfName = new Map<string, SubjectLook>();
-  for (const grade of grades) {
+  for (const grade of all) {
     const look = resolve(grade.source, grade.course_id, grade.course_name);
     if (look.subject && !subjectOfName.has(nameKey(grade))) {
       subjectOfName.set(nameKey(grade), look);
     }
   }
+  const grades = all.filter((grade) => grade.category === category);
   const courses = new Map<string, CourseGrades>();
   for (const grade of grades) {
     const own = resolve(grade.source, grade.course_id, grade.course_name);
