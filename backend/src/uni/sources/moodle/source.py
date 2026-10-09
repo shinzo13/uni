@@ -8,6 +8,7 @@ from uni.domain import (
     AssignmentKind,
     AssignmentStatus,
     Attachment,
+    Completion,
     Course,
     CourseItem,
     CourseSection,
@@ -38,6 +39,8 @@ SUBMISSION_STATUSES = {
     "submitted": AssignmentStatus.SUBMITTED,
 }
 EMPTY_GRADES = {"", "-"}
+MANUAL_COMPLETION = 1
+COMPLETE_STATES = {1, 2}
 HIDDEN_GRADES_CODE = "nopermissiontoviewgrades"
 
 
@@ -180,7 +183,19 @@ class MoodleSource:
             url=url,
             html=page_html.get(module["id"]) or module.get("description") or "",
             attachments=() if kind == ItemKind.PAGE else tuple(attachment(file) for file in files),
+            modified_at=_modified_at(module),
+            completion=_completion(module),
+            manual_completion=module.get("completion") == MANUAL_COMPLETION,
         )
+
+    async def set_completion(self, item_id: str, completed: bool) -> None:
+        result = await self.client.call(
+            "core_completion_update_activity_completion_status_manually",
+            cmid=item_id,
+            completed=int(completed),
+        )
+        if not result.get("status"):
+            raise SourceError(f"moodle completion of {item_id} was not updated")
 
     async def _assigns(self, course_ids: list[str], names: dict[str, str]) -> list[Assignment]:
         payload = await self.client.call("mod_assign_get_assignments", courseids=course_ids)
@@ -294,3 +309,18 @@ class MoodleSource:
                 )
             )
         return grades
+
+
+def _modified_at(module: dict[str, Any]) -> datetime | None:
+    times = [
+        file.get("timemodified") or file.get("timecreated") or 0 for file in module.get("contents") or []
+    ]
+    latest = max(times, default=0) or (module.get("contentsinfo") or {}).get("lastmodified")
+    return timestamp(latest)
+
+
+def _completion(module: dict[str, Any]) -> Completion:
+    if not module.get("completion"):
+        return Completion.UNTRACKED
+    state = (module.get("completiondata") or {}).get("state")
+    return Completion.COMPLETE if state in COMPLETE_STATES else Completion.INCOMPLETE

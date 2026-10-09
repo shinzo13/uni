@@ -1,9 +1,9 @@
 from datetime import date
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
 
-from uni.api.deps import AggregatorDep
-from uni.api.schemas import Page
+from uni.api.deps import AggregatorDep, ProgressDep
+from uni.api.schemas import CompletionIn, Page
 from uni.domain import (
     AcademicEvent,
     Assignment,
@@ -15,6 +15,7 @@ from uni.domain import (
     Post,
     SourceKind,
 )
+from uni.progress import MoodleNotLinked
 from uni.sources.base import (
     AssignmentSource,
     CalendarSource,
@@ -24,6 +25,7 @@ from uni.sources.base import (
     MaterialSource,
     PostSource,
     ScheduleSource,
+    SourceError,
 )
 
 router = APIRouter(tags=["data"])
@@ -94,6 +96,16 @@ async def sections(
         only=kind,
     )
     return Page.of(collected)
+
+
+@router.post("/courses/moodle/{course_id}/items/{item_id}/completion", status_code=status.HTTP_204_NO_CONTENT)
+async def set_completion(course_id: str, item_id: str, body: CompletionIn, progress: ProgressDep) -> None:
+    try:
+        await progress.set_completion(course_id, item_id, body.completed)
+    except MoodleNotLinked as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "moodle is not linked") from error
+    except SourceError as error:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "moodle did not accept the change") from error
 
 
 @router.get("/posts")

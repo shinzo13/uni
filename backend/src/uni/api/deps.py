@@ -11,6 +11,7 @@ from uni.aggregator import Aggregator
 from uni.config import Settings
 from uni.linking import Linker
 from uni.models import User
+from uni.progress import Progress
 from uni.registry import SourceRegistry
 from uni.subjects import Subjects
 
@@ -76,3 +77,10 @@ def get_subjects(db: Db, user: CurrentUser) -> Subjects:
 
 
 SubjectsDep = Annotated[Subjects, Depends(get_subjects)]
+
+
+def get_progress(db: Db, registry: Registry, user: CurrentUser) -> Progress:
+    return Progress(db, registry, user)
+
+
+ProgressDep = Annotated[Progress, Depends(get_progress)]

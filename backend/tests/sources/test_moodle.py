@@ -6,7 +6,7 @@ import httpx
 import pytest
 import respx
 
-from uni.domain import AssignmentKind, AssignmentStatus, GradeCategory, ItemKind
+from uni.domain import AssignmentKind, AssignmentStatus, Completion, GradeCategory, ItemKind
 from uni.sources.base import CredentialsExpired, SourceError
 from uni.sources.moodle.client import MoodleClient, flatten, launch_url, token_from_launch
 from uni.sources.moodle.source import MoodleSource
@@ -201,3 +201,61 @@ async def test_invalid_token_means_expired_credentials(source):
 
     with pytest.raises(CredentialsExpired):
         await source.courses()
+
+
+@respx.mock
+async def test_sections_carry_modification_time_and_completion(source):
+    serve(
+        {
+            "core_course_get_contents": [
+                {
+                    "id": 1,
+                    "name": "Week 1",
+                    "modules": [
+                        {
+                            "id": 60,
+                            "name": "Slides",
+                            "modname": "resource",
+                            "completion": 1,
+                            "completiondata": {"state": 1},
+                            "contents": [
+                                {
+                                    "type": "file",
+                                    "filename": "a.pdf",
+                                    "fileurl": "f",
+                                    "timemodified": 1760000000,
+                                },
+                                {
+                                    "type": "file",
+                                    "filename": "b.pdf",
+                                    "fileurl": "g",
+                                    "timemodified": 1760001000,
+                                },
+                            ],
+                        },
+                        {
+                            "id": 61,
+                            "name": "Quiz",
+                            "modname": "quiz",
+                            "completion": 2,
+                            "completiondata": {"state": 0},
+                        },
+                        {"id": 62, "name": "Note", "modname": "label"},
+                    ],
+                }
+            ],
+            "mod_page_get_pages_by_courses": {"pages": []},
+            "core_completion_update_activity_completion_status_manually": {"status": True},
+        }
+    )
+
+    [section] = await source.sections("10")
+    await source.set_completion("60", False)
+
+    assert [(item.completion, item.manual_completion) for item in section.items] == [
+        (Completion.COMPLETE, True),
+        (Completion.INCOMPLETE, False),
+        (Completion.UNTRACKED, False),
+    ]
+    assert section.items[0].modified_at.timestamp() == 1760001000
+    assert section.items[2].modified_at is None

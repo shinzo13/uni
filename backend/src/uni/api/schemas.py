@@ -49,6 +49,10 @@ class SourceStateOut(BaseModel):
     error: str | None
 
 
+class CompletionIn(BaseModel):
+    completed: bool
+
+
 class Page[T](BaseModel):
     items: list[T]
     sources: list[SourceStateOut]

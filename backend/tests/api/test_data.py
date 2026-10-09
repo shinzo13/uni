@@ -3,7 +3,7 @@ import uuid
 import pytest
 from sqlalchemy import select
 
-from uni.domain import Assignment, SourceKind
+from uni.domain import Assignment, CourseItem, CourseSection, ItemKind, SourceKind
 from uni.models import Snapshot, SourceLink, User
 from uni.sources.base import CredentialsExpired, SourceError
 
@@ -110,3 +110,32 @@ async def test_snapshot_with_outdated_schema_is_refetched(signed_in, linked, app
 
     assert [item["title"] for item in response.json()["items"]] == ["Lab"]
     assert linked["moodle"].calls == 2
+
+
+class FakeMoodle:
+    kind = SourceKind.MOODLE
+
+    def __init__(self):
+        self.changes: list[tuple[str, bool]] = []
+
+    async def sections(self, course_id: str) -> list[CourseSection]:
+        return [
+            CourseSection(
+                id="s", title="Week", items=(CourseItem(id="7", kind=ItemKind.FILE, title="Slides"),)
+            )
+        ]
+
+    async def set_completion(self, item_id: str, completed: bool) -> None:
+        self.changes.append((item_id, completed))
+
+
+async def test_completion_is_sent_to_moodle_and_patched_into_the_snapshot(signed_in, linked):
+    linked["moodle"] = FakeMoodle()
+    await signed_in.get("/courses/moodle/10/sections")
+
+    response = await signed_in.post("/courses/moodle/10/items/7/completion", json={"completed": True})
+    sections = (await signed_in.get("/courses/moodle/10/sections")).json()["items"]
+
+    assert response.status_code == 204
+    assert linked["moodle"].changes == [("7", True)]
+    assert sections[0]["items"][0]["completion"] == "complete"

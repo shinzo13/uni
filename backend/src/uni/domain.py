@@ -106,6 +106,12 @@ class ItemKind(StrEnum):
     OTHER = "other"
 
 
+class Completion(StrEnum):
+    UNTRACKED = "untracked"
+    INCOMPLETE = "incomplete"
+    COMPLETE = "complete"
+
+
 class CourseItem(Model):
     id: str
     kind: ItemKind
@@ -113,6 +119,9 @@ class CourseItem(Model):
     url: str | None = None
     html: str = ""
     attachments: tuple[Attachment, ...] = ()
+    modified_at: datetime | None = None
+    completion: Completion = Completion.UNTRACKED
+    manual_completion: bool = False
 
 
 class CourseSection(Model):
