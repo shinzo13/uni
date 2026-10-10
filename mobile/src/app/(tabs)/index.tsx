@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { ConnectivityBanner } from '@/components/ConnectivityBanner';
 import { useAcademicEvents, useClasses, useExams } from '@/api/queries';
 import type { AcademicEvent, ClassSession, Exam, SourceKind } from '@/api/types';
 import { Loading } from '@/components/Loading';
@@ -18,6 +19,7 @@ const DEFAULT_FIRST_HOUR = 8;
 const DEFAULT_LAST_HOUR = 18;
 const DAY_LABELS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
 const CALENDAR_RANGE_DAYS = 200;
+const SWIPE_DISTANCE = 70;
 const KIND_COLORS: Record<string, string> = {
   WYK: '#1565A8',
   CW: '#0B6E5A',
@@ -46,8 +48,9 @@ type Block = {
 
 export default function ScheduleScreen() {
   const today = new Date();
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(today));
-  const [dayIndex, setDayIndex] = useState(() => Math.min((today.getDay() + 6) % 7, 4));
+  const [weekStart, setWeekStart] = useState(() => initialView(today).week);
+  const [dayIndex, setDayIndex] = useState(() => initialView(today).day);
+  const touch = useRef<{ x: number; y: number } | null>(null);
   const start = isoDate(weekStart);
   const end = isoDate(addDays(weekStart, 6));
   const calendarStart = isoDate(addDays(startOfWeek(today), -30));
@@ -77,13 +80,36 @@ export default function ScheduleScreen() {
 
   const moveWeek = (weeks: number) => setWeekStart(addDays(weekStart, weeks * 7));
   const goToday = () => {
-    setWeekStart(startOfWeek(today));
-    setDayIndex(Math.min((today.getDay() + 6) % 7, 6));
+    const view = initialView(today);
+    setWeekStart(view.week);
+    setDayIndex(view.day);
+  };
+  const shiftDay = (direction: 1 | -1) => {
+    const position = days.indexOf(days.includes(dayIndex) ? dayIndex : 0) + direction;
+    if (position >= 0 && position < days.length) {
+      setDayIndex(days[position]);
+      return;
+    }
+    setWeekStart(addDays(weekStart, direction * 7));
+    setDayIndex(direction === 1 ? 0 : 4);
+  };
+  const onTouchEnd = (x: number, y: number) => {
+    const start = touch.current;
+    touch.current = null;
+    if (!start) {
+      return;
+    }
+    const dx = x - start.x;
+    const dy = y - start.y;
+    if (Math.abs(dx) > SWIPE_DISTANCE && Math.abs(dx) > Math.abs(dy) * 2) {
+      shiftDay(dx < 0 ? 1 : -1);
+    }
   };
   const refresh = () => Promise.all([classes.refresh(), exams.refresh(), events.refresh()]).catch(() => undefined);
 
   return (
     <View style={styles.screen}>
+      <ConnectivityBanner />
       <View style={styles.weekBar}>
         <Pressable accessibilityLabel="Previous week" hitSlop={12} onPress={() => moveWeek(-1)}>
           <Ionicons name="chevron-back" size={22} color={colors.text} />
@@ -123,6 +149,10 @@ export default function ScheduleScreen() {
         <Loading />
       ) : (
         <ScrollView
+          onTouchStart={(event) => {
+            touch.current = { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY };
+          }}
+          onTouchEnd={(event) => onTouchEnd(event.nativeEvent.pageX, event.nativeEvent.pageY)}
           refreshControl={
             <RefreshControl
               refreshing={classes.refreshing || exams.refreshing || events.refreshing}
@@ -138,6 +168,14 @@ export default function ScheduleScreen() {
       )}
     </View>
   );
+}
+
+function initialView(today: Date) {
+  const weekday = (today.getDay() + 6) % 7;
+  if (weekday >= 5) {
+    return { week: addDays(startOfWeek(today), 7), day: 0 };
+  }
+  return { week: startOfWeek(today), day: weekday };
 }
 
 function EventBanner({ event }: { event: AcademicEvent }) {

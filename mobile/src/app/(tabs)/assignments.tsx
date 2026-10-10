@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
 
+import { ConnectivityBanner } from '@/components/ConnectivityBanner';
 import { useAssignments } from '@/api/queries';
 import type { Assignment } from '@/api/types';
 import { EmptyState } from '@/components/EmptyState';
@@ -37,6 +38,7 @@ export default function AssignmentsScreen() {
 
   return (
     <View style={styles.screen}>
+      <ConnectivityBanner />
       <Segmented options={TABS} value={tab} onChange={setTab} />
       <SourceIssues sources={assignments.data?.sources} />
       {assignments.isLoading ? (
@@ -54,9 +56,7 @@ export default function AssignmentsScreen() {
           }
           renderSectionHeader={({ section }) => <SectionHeader title={section.title} />}
           renderItem={({ item }) => <AssignmentRow assignment={item} current={tab === 'current'} resolve={resolve} />}
-          ListEmptyComponent={
-            <EmptyState title={tab === 'current' ? 'Nothing due' : 'No past assignments'} />
-          }
+          ListEmptyComponent={<EmptyState title={tab === 'current' ? 'Nothing due' : 'No past assignments'} />}
         />
       )}
     </View>

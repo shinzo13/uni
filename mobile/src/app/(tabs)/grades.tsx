@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
 
+import { ConnectivityBanner } from '@/components/ConnectivityBanner';
 import { useGrades } from '@/api/queries';
 import type { Grade, GradeCategory } from '@/api/types';
 import { EmptyState } from '@/components/EmptyState';
@@ -35,15 +36,13 @@ export default function GradesScreen() {
   const [category, setCategory] = useState<GradeCategory>('assignment');
   const [open, setOpen] = useState<string | null>(null);
   const sections = useMemo(
-    () =>
-      byTerm(
-        groupByCourse(grades.data?.items ?? [], category, resolve),
-      ),
+    () => byTerm(groupByCourse(grades.data?.items ?? [], category, resolve)),
     [grades.data, category, resolve],
   );
 
   return (
     <View style={styles.screen}>
+      <ConnectivityBanner />
       <Segmented options={CATEGORIES} value={category} onChange={setCategory} />
       <SourceIssues sources={grades.data?.sources} />
       {grades.isLoading ? (
@@ -104,7 +103,9 @@ function CourseBlock({ course, expanded, onToggle }: BlockProps) {
             <View key={`${grade.source}-${grade.name}-${index}`} style={styles.entry}>
               <View style={styles.entryMain}>
                 <Text style={text.body}>{grade.name}</Text>
-                <Text style={text.caption}>{[sourceNames[grade.source], grade.comment].filter(Boolean).join(' · ')}</Text>
+                <Text style={text.caption}>
+                  {[sourceNames[grade.source], grade.comment].filter(Boolean).join(' · ')}
+                </Text>
               </View>
               <Text style={[styles.value, grade.passed === false && { color: colors.danger }]}>
                 {grade.max_value ? `${grade.value} / ${grade.max_value}` : grade.value}

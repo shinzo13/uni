@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { ConnectivityBanner } from '@/components/ConnectivityBanner';
 import { Loading } from '@/components/Loading';
 import { Segmented } from '@/components/Segmented';
 import { SourceIssues } from '@/components/SourceIssues';
@@ -30,6 +31,7 @@ export default function CoursesScreen() {
 
   return (
     <View style={styles.screen}>
+      <ConnectivityBanner />
       <Segmented options={SCOPES} value={scope} onChange={setScope} />
       <SourceIssues sources={entries.sources} />
       {entries.isLoading ? (

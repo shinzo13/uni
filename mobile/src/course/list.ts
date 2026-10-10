@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useMemo } from 'react';
 
-import { useAssignments, useCourses, usePosts } from '@/api/queries';
+import { useAssignments, useCourses, usePosts, useSubjects } from '@/api/queries';
 import type { Assignment, ClassSession, Course, Post } from '@/api/types';
 import { useUpcomingClasses } from '@/course/data';
 import { useDesign } from '@/design/DesignProvider';
@@ -46,6 +46,7 @@ export function isOpenTask(assignment: Assignment, now: number) {
 
 export function useCourseEntries(scope: Scope) {
   const courses = useCourses();
+  const subjects = useSubjects();
   const posts = usePosts();
   const assignments = useAssignments();
   const classes = useUpcomingClasses();
@@ -127,9 +128,13 @@ export function useCourseEntries(scope: Scope) {
   }, [courses.data, posts.data, assignments.data, classes.data, resolve, lastSeen, scope, now]);
 
   const refresh = async () => {
-    await Promise.all([courses.refresh(), posts.refresh(), assignments.refresh(), classes.refresh()]).catch(
-      () => undefined,
-    );
+    await Promise.all([
+      courses.refresh(),
+      posts.refresh(),
+      assignments.refresh(),
+      classes.refresh(),
+      subjects.refetch(),
+    ]).catch(() => undefined);
   };
 
   return {
