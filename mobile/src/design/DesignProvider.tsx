@@ -56,7 +56,10 @@ export function DesignProvider({ children }: PropsWithChildren) {
         if (COURSE_LIST_LAYOUTS.some((option) => option.value === listLayout)) {
           setCourseListLayoutState(listLayout as CourseListLayout);
         }
-        setSeen(stored ? JSON.parse(stored) : {});
+        if (stored) {
+          const parsed: Record<string, string> = JSON.parse(stored);
+          setSeen((current) => ({ ...parsed, ...current }));
+        }
       })
       .catch(() => undefined);
   }, []);

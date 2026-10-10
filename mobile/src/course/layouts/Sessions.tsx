@@ -120,17 +120,17 @@ function buildMeetings(sessions: ClassSession[], refs: CourseRef[]): Meeting[] {
   sessions
     .filter((session) => members.has(refKey(session.source, session.course_id)))
     .forEach((session) => unique.set(`${session.starts_at}|${session.kind_code ?? session.kind}`, session));
-  const sorted = [...unique.values()].sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  const sorted = [...unique.entries()].sort(([, a], [, b]) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
   if (sorted.length === 0) return [];
-  const firstWeek = startOfWeek(new Date(sorted[0].starts_at)).getTime();
+  const firstWeek = startOfWeek(new Date(sorted[0][1].starts_at)).getTime();
   const counters = new Map<string, number>();
-  return sorted.map((session) => {
+  return sorted.map(([key, session]) => {
     const code = (session.kind_code ?? session.kind.slice(0, 3)).toUpperCase();
     const number = (counters.get(code) ?? 0) + 1;
     counters.set(code, number);
     const start = new Date(session.starts_at);
     return {
-      key: `${session.starts_at}|${code}`,
+      key,
       session,
       code,
       number,
@@ -184,9 +184,7 @@ function matchSections(moodle: MoodleCourse[], meetings: Meeting[]): Matching {
   moodle.forEach((course) => {
     const courseKind = kindOf(course.detail) ?? dominantKind(course);
     course.sections.forEach((section) => {
-      const placed = section.items
-        .filter(isVisibleItem)
-        .map((item) => ({ item, section, courseId: course.courseId }));
+      const placed = section.items.filter(isVisibleItem).map((item) => ({ item, section, courseId: course.courseId }));
       if (placed.length === 0) return;
       const key = `${course.courseId}:${section.id}`;
       const sectionKind = kindOf(section.title);
@@ -278,24 +276,32 @@ export function SessionsLayout({ data }: CourseLayoutProps) {
 
   const dueWindow = useMemo(() => {
     if (!selected) return [];
-    const from = selected.session.starts_at;
-    const until = meetings[selectedIndex + 1]?.session.starts_at ?? null;
+    const from = Date.parse(selected.session.starts_at);
+    const following = meetings[selectedIndex + 1];
+    const until = following ? Date.parse(following.session.starts_at) : null;
     const shown = new Set(
       selectedGroups.flatMap((group) => group.items.map((entry) => `${entry.courseId}|${entry.item.title}`)),
     );
     return data.assignments
-      .filter((assignment) => assignment.due_at && assignment.due_at >= from && (!until || assignment.due_at < until))
-      .filter((assignment) => !(assignment.source === 'moodle' && shown.has(`${assignment.course_id}|${assignment.title}`)))
+      .filter((assignment) => {
+        const due = assignment.due_at ? Date.parse(assignment.due_at) : null;
+        return due !== null && due >= from && (until === null || due < until);
+      })
+      .filter(
+        (assignment) => !(assignment.source === 'moodle' && shown.has(`${assignment.course_id}|${assignment.title}`)),
+      )
       .sort((a, b) => (a.due_at ?? '').localeCompare(b.due_at ?? ''));
   }, [selected, selectedIndex, selectedGroups, meetings, data.assignments]);
 
   const openTasks = useMemo(() => {
-    const inWindow = new Set(mode === 'focus' ? dueWindow.map((assignment) => assignment.id) : []);
+    const inWindow = new Set(
+      mode === 'focus' ? dueWindow.map((assignment) => `${assignment.source}:${assignment.id}`) : [],
+    );
     return data.assignments
       .filter(
         (assignment) =>
           isOpen(assignment) &&
-          !inWindow.has(assignment.id) &&
+          !inWindow.has(`${assignment.source}:${assignment.id}`) &&
           (!assignment.due_at || new Date(assignment.due_at).getTime() > now),
       )
       .sort((a, b) => (a.due_at ?? '9999').localeCompare(b.due_at ?? '9999'));
@@ -333,7 +339,11 @@ export function SessionsLayout({ data }: CourseLayoutProps) {
               placed={entry}
               tint={tint}
               isNew={isNewSince(entry.item, data.lastSeen)}
-              caption={assignment?.due_at ? `Due ${formatShortDate(assignment.due_at)} · ${formatTime(assignment.due_at)}` : null}
+              caption={
+                assignment?.due_at
+                  ? `Due ${formatShortDate(assignment.due_at)} · ${formatTime(assignment.due_at)}`
+                  : null
+              }
               onOpen={openers.openItem}
               onOpenAttachment={(attachment) => {
                 openers.openAttachment(attachment).catch(() => undefined);
@@ -403,7 +413,9 @@ export function SessionsLayout({ data }: CourseLayoutProps) {
                   {selected.code} {selected.number}
                 </Text>
               </View>
-              <Text style={[styles.when, selectedIndex === nextIndex && { color: tint }]}>{whenLabel(selected, now)}</Text>
+              <Text style={[styles.when, selectedIndex === nextIndex && { color: tint }]}>
+                {whenLabel(selected, now)}
+              </Text>
             </View>
             <Text style={type.headline}>{formatDay(selected.session.starts_at)}</Text>
             <Text style={type.body}>
@@ -429,7 +441,12 @@ export function SessionsLayout({ data }: CourseLayoutProps) {
                 <View style={styles.group}>
                   <Text style={styles.groupTitle}>Due before the next class</Text>
                   {dueWindow.map((assignment) => (
-                    <AssignmentRow key={`${assignment.source}:${assignment.id}`} assignment={assignment} tint={tint} now={now} />
+                    <AssignmentRow
+                      key={`${assignment.source}:${assignment.id}`}
+                      assignment={assignment}
+                      tint={tint}
+                      now={now}
+                    />
                   ))}
                 </View>
               ) : null}
@@ -494,7 +511,11 @@ export function SessionsLayout({ data }: CourseLayoutProps) {
                   {matching.general.map((group) => group.title).join(' · ')}
                 </Text>
               </View>
-              <MaterialCommunityIcons name={generalOpen ? 'chevron-up' : 'chevron-down'} size={22} color={colors.muted} />
+              <MaterialCommunityIcons
+                name={generalOpen ? 'chevron-up' : 'chevron-down'}
+                size={22}
+                color={colors.muted}
+              />
             </Pressable>
             {generalOpen ? renderItems(matching.general) : null}
           </View>
@@ -503,9 +524,16 @@ export function SessionsLayout({ data }: CourseLayoutProps) {
 
       {openTasks.length > 0 ? (
         <View style={styles.block}>
-          <Text style={[styles.overline, styles.blockTitle]}>{mode === 'focus' && selected ? 'Later tasks' : 'Open tasks'}</Text>
+          <Text style={[styles.overline, styles.blockTitle]}>
+            {mode === 'focus' && selected ? 'Later tasks' : 'Open tasks'}
+          </Text>
           {openTasks.map((assignment) => (
-            <AssignmentRow key={`${assignment.source}:${assignment.id}`} assignment={assignment} tint={tint} now={now} />
+            <AssignmentRow
+              key={`${assignment.source}:${assignment.id}`}
+              assignment={assignment}
+              tint={tint}
+              now={now}
+            />
           ))}
         </View>
       ) : null}
@@ -588,7 +616,12 @@ function MeetingStrip({ meetings, selectedIndex, nextIndex, now, tint, matched, 
                 {meeting.code} {meeting.number}
               </Text>
               {hasMaterials ? (
-                <View style={[styles.chipDot, { backgroundColor: selected ? colors.background : past ? colors.muted : tint }]} />
+                <View
+                  style={[
+                    styles.chipDot,
+                    { backgroundColor: selected ? colors.background : past ? colors.muted : tint },
+                  ]}
+                />
               ) : null}
             </View>
             <Text style={[styles.chipDate, { color: foreground }]}>
@@ -667,7 +700,11 @@ function Timeline({ meetings, nextIndex, now, tint, matched, renderItems, onFocu
                 {count > 0 ? (
                   <View style={styles.count}>
                     <Text style={[styles.countText, { color: past ? colors.muted : tint }]}>{count}</Text>
-                    <MaterialCommunityIcons name={expanded ? 'chevron-up' : 'chevron-down'} size={20} color={colors.muted} />
+                    <MaterialCommunityIcons
+                      name={expanded ? 'chevron-up' : 'chevron-down'}
+                      size={20}
+                      color={colors.muted}
+                    />
                   </View>
                 ) : (
                   <MaterialCommunityIcons name="chevron-right" size={20} color={colors.border} />

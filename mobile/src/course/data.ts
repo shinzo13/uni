@@ -4,7 +4,16 @@ import { useCallback, useMemo } from 'react';
 
 import { request } from '@/api/client';
 import { useAssignments, useClasses, useGrades, useMoodleSections, usePosts } from '@/api/queries';
-import type { Assignment, Attachment, ClassSession, CourseItem, CourseSection, Grade, Post, SourceKind } from '@/api/types';
+import type {
+  Assignment,
+  Attachment,
+  ClassSession,
+  CourseItem,
+  CourseSection,
+  Grade,
+  Post,
+  SourceKind,
+} from '@/api/types';
 import { useDesign } from '@/design/DesignProvider';
 import { addDays, courseDetail, currentTerm, isoDate } from '@/format';
 import { useSession } from '@/session/SessionProvider';
@@ -98,7 +107,9 @@ export function useCourseData(look: SubjectLook): CourseData {
   const items = useMemo(
     () =>
       moodle.flatMap((course) =>
-        course.sections.flatMap((section) => section.items.map((item) => ({ item, section, courseId: course.courseId }))),
+        course.sections.flatMap((section) =>
+          section.items.map((item) => ({ item, section, courseId: course.courseId })),
+        ),
       ),
     [moodle],
   );
@@ -110,11 +121,15 @@ export function useCourseData(look: SubjectLook): CourseData {
         .sort((a, b) => b.posted_at.localeCompare(a.posted_at)),
       assignments: (assignments.data?.items ?? []).filter((item) => belongs(item.source, item.course_id)),
       grades: (grades.data?.items ?? []).filter((grade) => belongs(grade.source, grade.course_id)),
-      upcoming: (classes.data?.items ?? []).filter(
+    }),
+    [posts.data, assignments.data, grades.data, belongs],
+  );
+  const upcoming = useMemo(
+    () =>
+      (classes.data?.items ?? []).filter(
         (session) => belongs(session.source, session.course_id) && new Date(session.ends_at).getTime() > now,
       ),
-    }),
-    [posts.data, assignments.data, grades.data, classes.data, belongs, now],
+    [classes.data, belongs, now],
   );
 
   const { markSeen: markKeySeen } = design;
@@ -135,6 +150,7 @@ export function useCourseData(look: SubjectLook): CourseData {
     moodle,
     items,
     ...filtered,
+    upcoming,
     lastSeen: design.lastSeen(look.key),
     isLoading: sections.isLoading,
     refreshing: sections.refreshing || posts.refreshing || assignments.refreshing,
@@ -160,7 +176,10 @@ export function useOpeners(assignments: Assignment[]) {
     (placed: PlacedItem) => {
       const { item, courseId } = placed;
       if (item.kind === 'page') {
-        router.push({ pathname: '/page/[kind]/[course]/[item]', params: { kind: 'moodle', course: courseId, item: item.id } });
+        router.push({
+          pathname: '/page/[kind]/[course]/[item]',
+          params: { kind: 'moodle', course: courseId, item: item.id },
+        });
         return;
       }
       if (item.kind === 'file' && item.attachments.length === 1) {
@@ -169,7 +188,8 @@ export function useOpeners(assignments: Assignment[]) {
       }
       if (item.kind === 'assignment' || item.kind === 'quiz') {
         const match = assignments.find(
-          (assignment) => assignment.source === 'moodle' && assignment.course_id === courseId && assignment.title === item.title,
+          (assignment) =>
+            assignment.source === 'moodle' && assignment.course_id === courseId && assignment.title === item.title,
         );
         if (match) {
           router.push({ pathname: '/assignment/[id]', params: { id: match.id, source: match.source } });
@@ -186,7 +206,9 @@ export function useOpeners(assignments: Assignment[]) {
     (placed: PlacedItem) =>
       assignments.find(
         (assignment) =>
-          assignment.source === 'moodle' && assignment.course_id === placed.courseId && assignment.title === placed.item.title,
+          assignment.source === 'moodle' &&
+          assignment.course_id === placed.courseId &&
+          assignment.title === placed.item.title,
       ) ?? null,
     [assignments],
   );

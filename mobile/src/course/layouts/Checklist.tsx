@@ -214,7 +214,7 @@ export function ChecklistLayout({ data }: CourseLayoutProps) {
           .filter((item) => item.kind !== 'label')
           .map((item) => {
             const placed = { item, section, courseId: course.courseId };
-            const assignment = findAssignment(placed);
+            const assignment = item.kind === 'assignment' || item.kind === 'quiz' ? findAssignment(placed) : null;
             if (assignment) matched.add(`${assignment.source}:${assignment.id}`);
             return itemLine(placed);
           });

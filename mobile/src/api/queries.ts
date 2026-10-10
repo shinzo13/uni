@@ -62,7 +62,10 @@ export function useCourses() {
 }
 
 export function useSections(kind: SourceKind, courseId: string) {
-  return usePage<CourseSection>(['sections', kind, courseId], `/courses/${kind}/${encodeURIComponent(courseId)}/sections`);
+  return usePage<CourseSection>(
+    ['sections', kind, courseId],
+    `/courses/${kind}/${encodeURIComponent(courseId)}/sections`,
+  );
 }
 
 export function usePosts() {
@@ -124,12 +127,21 @@ export function useSubjectActions() {
     const invalidate = () => queryClient.invalidateQueries({ queryKey: ['subjects'] });
     return {
       save: (draft: SubjectDraft, id?: string) =>
-        request<Subject>(id ? `/subjects/${id}` : '/subjects', { method: id ? 'PUT' : 'POST', token, body: draft }).then(
-          invalidate,
-        ),
+        request<Subject>(id ? `/subjects/${id}` : '/subjects', {
+          method: id ? 'PUT' : 'POST',
+          token,
+          body: draft,
+        }).then(invalidate),
       remove: (id: string) => request<void>(`/subjects/${id}`, { method: 'DELETE', token }).then(invalidate),
     };
   }, [queryClient, token]);
+}
+
+function combineSections(results: { data?: Page<CourseSection>; isLoading: boolean }[]) {
+  return {
+    pages: results.map((result) => result.data),
+    isLoading: results.some((result) => result.isLoading),
+  };
 }
 
 function sectionsPath(courseId: string) {
@@ -140,12 +152,13 @@ export function useMoodleSections(courseIds: string[]) {
   const { token } = useSession();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
-  const results = useQueries({
+  const { pages, isLoading } = useQueries({
     queries: courseIds.map((courseId) => ({
       queryKey: ['sections', 'moodle', courseId, {}],
       queryFn: () => request<Page<CourseSection>>(sectionsPath(courseId), { token }),
       enabled: !!token,
     })),
+    combine: combineSections,
   });
   const refresh = async () => {
     setRefreshing(true);
@@ -163,8 +176,8 @@ export function useMoodleSections(courseIds: string[]) {
     }
   };
   return {
-    pages: results.map((result) => result.data),
-    isLoading: results.some((result) => result.isLoading),
+    pages,
+    isLoading,
     refresh,
     refreshing,
   };
