@@ -70,7 +70,7 @@ export const KIND_LABELS: Record<CourseItem['kind'], string> = {
 };
 
 const LECTURE_TITLES = /wykład|wyklad|lecture|slajd|slide|prezentac|moduł|modul|rozdział|chapter|notatk/i;
-const INFO_TITLES = /warunki|zaliczen|regulamin|sylabus|syllabus|literatur|dyżur|dyzur|konsultac|informac|ogłosz|harmonogram|kontakt/i;
+const INFO_TITLES = /warunki|zasady|regulamin|sylabus|syllabus|literatur|dyżur|dyzur|konsultac|harmonogram|kontakt|organizac/i;
 
 export function fileKind(attachment: Attachment): FileKind {
   const byName = EXTENSIONS.find(([pattern]) => pattern.test(attachment.name))?.[1];
@@ -130,8 +130,8 @@ export function shelfOf(item: CourseItem, sectionTitle: string): Shelf {
   if (item.kind === 'assignment' || item.kind === 'quiz') return 'tasks';
   if (item.kind === 'forum') return 'discussion';
   if (item.kind === 'link') return 'links';
-  if (INFO_TITLES.test(item.title) || (item.kind === 'page' && INFO_TITLES.test(sectionTitle))) return 'info';
-  if (item.kind === 'page') return 'info';
+  if (INFO_TITLES.test(item.title)) return 'info';
+  if (item.kind === 'page') return 'lectures';
   const file = itemFileKind(item);
   if (file === 'slides' || LECTURE_TITLES.test(item.title) || LECTURE_TITLES.test(sectionTitle)) return 'lectures';
   return 'files';

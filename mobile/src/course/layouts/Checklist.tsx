@@ -617,7 +617,7 @@ function CheckBox({ line, tint }: { line: Line; tint: string }) {
       hitSlop={4}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: done }}
-      accessibilityLabel={line.title}
+      accessibilityLabel={`Mark ${line.title} as ${done ? 'not done' : 'done'}`}
     >
       {box}
     </Pressable>

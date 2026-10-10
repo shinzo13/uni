@@ -417,12 +417,14 @@ export function SessionsLayout({ data }: CourseLayoutProps) {
                 {whenLabel(selected, now)}
               </Text>
             </View>
-            <Text style={type.headline}>{formatDay(selected.session.starts_at)}</Text>
-            <Text style={type.body}>
-              {formatTime(selected.session.starts_at)}–{formatTime(selected.session.ends_at)} ·{' '}
-              {KIND_NAMES[selected.code] ?? selected.session.kind}
-              {selected.session.group_number ? ` · group ${selected.session.group_number}` : ''}
-            </Text>
+            <View style={styles.cardTitle}>
+              <Text style={type.headline}>{formatDay(selected.session.starts_at)}</Text>
+              <Text style={type.body}>
+                {formatTime(selected.session.starts_at)}–{formatTime(selected.session.ends_at)} ·{' '}
+                {KIND_NAMES[selected.code] ?? selected.session.kind}
+                {selected.session.group_number ? ` · group ${selected.session.group_number}` : ''}
+              </Text>
+            </View>
             {placeLine(selected.session) || selected.session.address ? (
               <View style={styles.place}>
                 <MaterialCommunityIcons name="map-marker-outline" size={18} color={colors.muted} />
@@ -588,7 +590,7 @@ function MeetingStrip({ meetings, selectedIndex, nextIndex, now, tint, matched, 
       initialScrollIndex={Math.max(0, selectedIndex - 1)}
       getItemLayout={(_, index) => ({
         length: CHIP_WIDTH + CHIP_GAP,
-        offset: spacing.md + (CHIP_WIDTH + CHIP_GAP) * index,
+        offset: (CHIP_WIDTH + CHIP_GAP) * index,
         index,
       })}
       renderItem={({ item: meeting, index }) => {
@@ -866,6 +868,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: spacing.xs,
   },
+  cardTitle: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, gap: 2 },
   cardBody: { paddingTop: spacing.sm, paddingBottom: spacing.sm },
   group: { paddingTop: spacing.sm },
   groupTitle: { ...type.label, paddingHorizontal: spacing.md, paddingBottom: spacing.xs },

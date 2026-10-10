@@ -136,7 +136,7 @@ function StoryCircle({
       onLongPress={onLongPress}
       style={({ pressed }) => [styles.story, pressed && styles.storyPressed]}
       accessibilityRole="button"
-      accessibilityLabel={`${entry.look.name}, ${entry.updates.length} updates`}
+      accessibilityLabel={`${entry.look.name}, ${entry.updates.length} ${entry.updates.length === 1 ? 'update' : 'updates'}`}
     >
       <View style={[styles.ring, { borderColor: seen ? colors.border : entry.look.tint }]}>
         <View style={styles.ringInner}>

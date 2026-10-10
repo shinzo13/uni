@@ -403,7 +403,7 @@ function BucketHeader({ section, tint }: { section: FeedSection; tint: string })
         )}
       </View>
       <Text style={[styles.bucketTitle, section.fresh && { color: tint }, pinned && { color: colors.danger }]}>
-        {section.title}
+        {section.title.toUpperCase()}
       </Text>
       {section.caption ? <Text style={type.caption}>{section.caption}</Text> : null}
       <Text style={[type.caption, styles.bucketCount]}>{section.data.length}</Text>
@@ -803,7 +803,6 @@ const styles = StyleSheet.create({
   bucketTitle: {
     ...type.label,
     fontSize: 13,
-    textTransform: 'uppercase',
     color: colors.text,
   },
   bucketCount: { marginLeft: 'auto' },

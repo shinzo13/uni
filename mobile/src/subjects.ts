@@ -43,13 +43,15 @@ export function useSubjectResolver(): Resolve {
         index.set(refKey(course.source, course.course_id), subject);
       }
     }
+    const groups = autoGroups([...courses.values()].filter((course) => !index.has(refKey(course.source, course.id))));
     return (source, courseId, fallbackName) => {
       const key = refKey(source, courseId);
       const subject = index.get(key) ?? null;
-      const members = subject?.courses ?? [{ source, course_id: courseId }];
+      const group = subject ? undefined : groups.get(key);
+      const members = subject?.courses ?? group?.members ?? [{ source, course_id: courseId }];
       const original = defaultName(members, courses) || courseTitle(fallbackName ?? courseId);
       return {
-        key: subject ? subject.id : key,
+        key: subject ? subject.id : (group?.key ?? key),
         name: subject?.name || original,
         color: subject?.color ?? null,
         icon: subject?.icon ?? null,
@@ -84,7 +86,10 @@ export function similarity(a: string, b: string) {
       .filter(Boolean);
   const words = (name: string) =>
     new Set(tokens(name).filter((word) => word.length > 2 && !/\d/.test(word) && !GENERIC_WORDS.has(word)));
-  const numbers = (name: string) => tokens(name).filter((word) => /^\d+$/.test(word)).join();
+  const numbers = (name: string) =>
+    tokens(name)
+      .filter((word) => /^\d+$/.test(word))
+      .join();
   if (numbers(a) && numbers(b) && numbers(a) !== numbers(b)) {
     return 0;
   }
@@ -189,4 +194,54 @@ export function autoTint(name: string) {
     hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
   }
   return subjectPalette[hash % (subjectPalette.length - 1)];
+}
+
+type AutoGroup = { key: string; members: CourseRef[] };
+
+function autoGroups(courses: Course[]) {
+  const usos = courses.filter((course) => course.source === 'usos');
+  const usosByTitle = new Map<string, Course[]>();
+  for (const course of usos) {
+    const title = courseTitle(course.name).toLowerCase();
+    usosByTitle.set(title, [...(usosByTitle.get(title) ?? []), course]);
+  }
+  const groupKey = (course: Course) => {
+    if (course.source === 'usos') {
+      return `auto:${course.id}`;
+    }
+    const coded = usos.find((candidate) => course.name.includes(candidate.id));
+    if (coded) {
+      return `auto:${coded.id}`;
+    }
+    const title = courseTitle(course.name).toLowerCase();
+    const term = courseTerm(course);
+    const namesakes = usosByTitle.get(title) ?? [];
+    const match = term
+      ? namesakes.find((candidate) => courseTerm(candidate) === term)
+      : namesakes.length === 1
+        ? namesakes[0]
+        : undefined;
+    if (match) {
+      return `auto:${match.id}`;
+    }
+    return term ? `auto:${title}|${term}` : null;
+  };
+  const byKey = new Map<string, CourseRef[]>();
+  const keys = new Map<string, string>();
+  for (const course of courses) {
+    const key = groupKey(course);
+    if (!key) {
+      continue;
+    }
+    keys.set(refKey(course.source, course.id), key);
+    byKey.set(key, [...(byKey.get(key) ?? []), { source: course.source, course_id: course.id }]);
+  }
+  const groups = new Map<string, AutoGroup>();
+  for (const [ref, key] of keys) {
+    const members = byKey.get(key)!;
+    if (members.length > 1) {
+      groups.set(ref, { key, members });
+    }
+  }
+  return groups;
 }

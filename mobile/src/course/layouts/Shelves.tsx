@@ -465,7 +465,7 @@ function EssentialCard({ placed, tint, detail, isNew, onPress }: EssentialProps)
         <MaterialCommunityIcons name={infoGlyph(placed.item.title) as never} size={20} color={tint} />
       </View>
       <View style={styles.flex}>
-        <Text style={styles.essentialTitle} numberOfLines={2}>
+        <Text style={styles.essentialTitle} numberOfLines={3}>
           {placed.item.title}
         </Text>
         {detail ? (
@@ -513,7 +513,7 @@ function MaterialCard({ placed, tint, detail, isNew, copies = 1, onPress }: Mate
         ) : null}
       </View>
       <View style={styles.cardBody}>
-        <Text style={styles.cardTitle} numberOfLines={2}>
+        <Text style={styles.cardTitle} numberOfLines={3}>
           {item.title}
         </Text>
         <View style={styles.flex} />

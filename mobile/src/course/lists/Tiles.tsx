@@ -6,7 +6,7 @@ import { Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from '
 import type { Assignment, ClassSession } from '@/api/types';
 import { EmptyState } from '@/components/EmptyState';
 import { type CourseEntry, type CourseListProps, editEntry, entryCaption, entryKey, openEntry } from '@/course/list';
-import { formatTime } from '@/format';
+import { courseDetail, formatTime } from '@/format';
 import { colors, radii, spacing, tinted, type } from '@/theme';
 import { useNow } from '@/useNow';
 
@@ -165,6 +165,7 @@ function Tile({ entry, now }: { entry: CourseEntry; now: number }) {
   const chipLabel = dueAt ? dueIn(dueAt, now) : entry.openTasks ? `${entry.openTasks} open tasks` : null;
   const chipInk = urgentDue ? colors.danger : look.tint;
   const chipFill = hot ? '#FFFFFF' : urgentDue ? tinted(colors.danger, 0.12) : tinted(look.tint, 0.16);
+  const detail = entry.look.courses.length === 1 ? courseDetail(entry.courses[0].name) : null;
   const status = entry.nextClass ? classLine(entry.nextClass, now) : entryCaption(entry);
 
   return (
@@ -187,9 +188,19 @@ function Tile({ entry, now }: { entry: CourseEntry; now: number }) {
     >
       <View style={styles.tileTop}>
         <MaterialCommunityIcons name={look.glyph as never} size={30} color={hot ? '#FFFFFF' : look.tint} />
+        {detail ? (
+          <Text style={[styles.detail, { color: soft }]} numberOfLines={1}>
+            {detail}
+          </Text>
+        ) : null}
         {entry.updates.length ? <View style={[styles.dot, { backgroundColor: hot ? '#FFFFFF' : look.tint }]} /> : null}
       </View>
-      <Text style={[styles.name, { color: ink }]} numberOfLines={2}>
+      <Text
+        style={[styles.name, { color: ink }]}
+        numberOfLines={3}
+        textBreakStrategy="balanced"
+        android_hyphenationFrequency="normal"
+      >
         {look.name}
       </Text>
       <View style={styles.statusRow}>
@@ -286,9 +297,10 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     marginTop: spacing.xs,
   },
+  detail: { ...type.label, flex: 1, marginLeft: spacing.sm, marginTop: spacing.xs },
   name: {
-    fontSize: 17,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 19,
     fontWeight: '700',
     marginTop: spacing.sm,
     flex: 1,

@@ -99,7 +99,7 @@ export function useCourseData(look: SubjectLook): CourseData {
           courseId,
           title: name,
           detail: courseDetail(name),
-          sections: sections.pages[position]?.items ?? [],
+          sections: withoutDuplicateForums(sections.pages[position]?.items ?? []),
         };
       }),
     [moodleIds, sections.pages, index],
@@ -186,6 +186,10 @@ export function useOpeners(assignments: Assignment[]) {
         openAttachment(item.attachments[0]).catch(() => undefined);
         return;
       }
+      if (item.kind === 'folder' || item.attachments.length > 1) {
+        router.push({ pathname: '/folder/[course]/[item]', params: { course: courseId, item: item.id } });
+        return;
+      }
       if (item.kind === 'assignment' || item.kind === 'quiz') {
         const match = assignments.find(
           (assignment) =>
@@ -213,4 +217,22 @@ export function useOpeners(assignments: Assignment[]) {
     [assignments],
   );
   return { openItem, openAttachment, findAssignment };
+}
+
+function withoutDuplicateForums(sections: CourseSection[]) {
+  const seen = new Set<string>();
+  return sections.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => {
+      if (item.kind !== 'forum') {
+        return true;
+      }
+      const key = item.title.trim().toLowerCase();
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    }),
+  }));
 }
