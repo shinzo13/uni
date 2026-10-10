@@ -5,7 +5,13 @@ import { LayoutAnimation, Pressable, RefreshControl, ScrollView, StyleSheet, Tex
 
 import type { Assignment, ClassSession, CourseSection, Grade } from '@/api/types';
 import { PostCard } from '@/components/PostCard';
-import { type CourseLayoutProps, type MoodleCourse, type PlacedItem, useOpeners } from '@/course/data';
+import {
+  beforeCurrentTerm,
+  type CourseLayoutProps,
+  type MaterialCourse,
+  type PlacedItem,
+  useOpeners,
+} from '@/course/data';
 import { ItemRow } from '@/course/ItemRow';
 import { isNewSince, isVisibleItem } from '@/course/items';
 import {
@@ -82,7 +88,7 @@ function sectionKey(courseId: string, section: CourseSection) {
 }
 
 export function DashboardLayout({ data }: CourseLayoutProps) {
-  const { look, moodle, posts, assignments, grades, upcoming, lastSeen } = data;
+  const { look, materials: moodle, posts, assignments, grades, upcoming, lastSeen } = data;
   const tint = look.tint;
   const now = useNow();
   const [allPosts, setAllPosts] = useState(false);
@@ -344,7 +350,8 @@ function AssignmentRow({
   divided: boolean;
 }) {
   const open = assignment.status === 'new' || assignment.status === 'draft';
-  const overdue = open && !!assignment.due_at && new Date(assignment.due_at).getTime() < now;
+  const overdue =
+    open && !!assignment.due_at && new Date(assignment.due_at).getTime() < now && !beforeCurrentTerm(assignment.due_at);
   const status =
     assignment.status === 'graded' && assignment.grade ? assignment.grade : STATUS_LABELS[assignment.status];
   const caption = [
@@ -394,7 +401,7 @@ function Materials({
   tint,
   lastSeen,
 }: {
-  courses: MoodleCourse[];
+  courses: MaterialCourse[];
   data: CourseLayoutProps['data'];
   tint: string;
   lastSeen: string | null;
@@ -504,7 +511,7 @@ function Materials({
                     </Text>
                   ) : null}
                   {items.map((item) => {
-                    const placed = { item, section, courseId: course.courseId };
+                    const placed = { item, section, courseId: course.courseId, source: course.source };
                     return (
                       <ItemRow
                         key={item.id}

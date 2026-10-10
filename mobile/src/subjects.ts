@@ -43,12 +43,26 @@ export function useSubjectResolver(): Resolve {
         index.set(refKey(course.source, course.course_id), subject);
       }
     }
-    const groups = autoGroups([...courses.values()].filter((course) => !index.has(refKey(course.source, course.id))));
+    const groups = autoGroups([...courses.values()]);
+    const attached = new Map<string, CourseRef[]>();
+    for (const [ref, group] of groups) {
+      const owner = group.members.map((member) => index.get(refKey(member.source, member.course_id))).find(Boolean);
+      if (owner && !index.has(ref)) {
+        const [source, ...rest] = ref.split(':');
+        index.set(ref, owner);
+        attached.set(owner.id, [
+          ...(attached.get(owner.id) ?? []),
+          { source: source as SourceKind, course_id: rest.join(':') },
+        ]);
+      }
+    }
     return (source, courseId, fallbackName) => {
       const key = refKey(source, courseId);
       const subject = index.get(key) ?? null;
       const group = subject ? undefined : groups.get(key);
-      const members = subject?.courses ?? group?.members ?? [{ source, course_id: courseId }];
+      const members = subject
+        ? [...subject.courses, ...(attached.get(subject.id) ?? [])]
+        : (group?.members ?? [{ source, course_id: courseId }]);
       const original = defaultName(members, courses) || courseTitle(fallbackName ?? courseId);
       return {
         key: subject ? subject.id : (group?.key ?? key),

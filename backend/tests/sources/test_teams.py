@@ -2,7 +2,7 @@ import httpx
 import pytest
 import respx
 
-from uni.domain import AssignmentStatus, GradeCategory
+from uni.domain import AssignmentStatus, GradeCategory, ItemKind
 from uni.sources.base import CredentialsExpired
 from uni.sources.teams.client import ASSIGNMENTS_URL, AUTHORITY, GRAPH_URL, TeamsClient
 from uni.sources.teams.source import TeamsSource, term_of
@@ -159,3 +159,56 @@ async def test_posts_skip_system_messages():
     assert post.author == "Teacher"
     assert [attachment.name for attachment in post.attachments] == ["a.pdf"]
     assert [reply.author for reply in post.replies] == ["Student"]
+
+
+@respx.mock
+async def test_channel_files_become_sections():
+    token_endpoint()
+    respx.get(f"{GRAPH_URL}/teams/{TEAM}/channels").mock(
+        return_value=httpx.Response(
+            200,
+            json={"value": [{"id": "c1", "displayName": "General"}, {"id": "c2", "displayName": "Empty"}]},
+        )
+    )
+    respx.get(f"{GRAPH_URL}/teams/{TEAM}/channels/c1/filesFolder").mock(
+        return_value=httpx.Response(200, json={"id": "root1", "parentReference": {"driveId": "d"}})
+    )
+    respx.get(f"{GRAPH_URL}/teams/{TEAM}/channels/c2/filesFolder").mock(
+        return_value=httpx.Response(404, json={})
+    )
+    respx.get(f"{GRAPH_URL}/drives/d/items/root1/children").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "value": [
+                    {
+                        "id": "f1",
+                        "name": "W01.pdf",
+                        "webUrl": "https://uam.sharepoint.com/W01.pdf",
+                        "file": {"mimeType": "application/pdf"},
+                        "size": 10,
+                        "lastModifiedDateTime": "2026-10-04T17:21:26Z",
+                    },
+                    {"id": "dir", "name": "Lab", "webUrl": "https://uam.sharepoint.com/Lab", "folder": {}},
+                ]
+            },
+        )
+    )
+    respx.get(f"{GRAPH_URL}/drives/d/items/dir/children").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "value": [
+                    {"id": "f2", "name": "a.py", "webUrl": "https://uam.sharepoint.com/Lab/a.py", "file": {}}
+                ]
+            },
+        )
+    )
+
+    [section] = await TeamsSource(TeamsClient("rt-1")).sections(TEAM)
+
+    assert section.title == "General"
+    assert [(item.kind, item.title, [a.name for a in item.attachments]) for item in section.items] == [
+        (ItemKind.FILE, "W01.pdf", ["W01.pdf"]),
+        (ItemKind.FOLDER, "Lab", ["a.py"]),
+    ]

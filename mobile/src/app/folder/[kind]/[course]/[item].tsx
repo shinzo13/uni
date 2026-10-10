@@ -3,6 +3,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useSections } from '@/api/queries';
+import type { SourceKind } from '@/api/types';
 import { EmptyState } from '@/components/EmptyState';
 import { Loading } from '@/components/Loading';
 import { useOpeners } from '@/course/data';
@@ -10,8 +11,8 @@ import { FILE_COLORS, FILE_GLYPHS, fileKind, formatSize } from '@/course/items';
 import { colors, radii, spacing, tinted, type } from '@/theme';
 
 export default function FolderScreen() {
-  const { course, item } = useLocalSearchParams<{ course: string; item: string }>();
-  const sections = useSections('moodle', course);
+  const { kind, course, item } = useLocalSearchParams<{ kind: SourceKind; course: string; item: string }>();
+  const sections = useSections(kind, course);
   const { openAttachment } = useOpeners([]);
   const folder = sections.data?.items.flatMap((section) => section.items).find((entry) => entry.id === item);
 

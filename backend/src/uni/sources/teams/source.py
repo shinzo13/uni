@@ -9,11 +9,15 @@ from uni.domain import (
     AssignmentStatus,
     Attachment,
     Course,
+    CourseItem,
+    CourseSection,
     Grade,
+    ItemKind,
     Post,
     SourceKind,
     assessed_category,
 )
+from uni.sources.base import SourceError
 from uni.sources.teams.client import TeamsClient
 
 PARALLEL_CALLS = 6
@@ -79,6 +83,43 @@ class TeamsSource:
             for (team, _), payload in zip(targets, messages, strict=True)
             for message in payload.get("value", [])
             if _is_user_message(message)
+        ]
+
+    async def sections(self, course_id: str) -> list[CourseSection]:
+        channels = await self.client.graph_pages(f"/teams/{course_id}/channels")
+        listings = await self._each(channels, lambda channel: self._channel_files(course_id, channel["id"]))
+        return [
+            CourseSection(id=channel["id"], title=channel["displayName"], items=tuple(items))
+            for channel, items in zip(channels, listings, strict=True)
+            if items
+        ]
+
+    async def _channel_files(self, team_id: str, channel_id: str) -> list[CourseItem]:
+        try:
+            folder = await self.client.graph(f"/teams/{team_id}/channels/{channel_id}/filesFolder")
+        except SourceError:
+            return []
+        drive = folder["parentReference"]["driveId"]
+        children = await self.client.graph_pages(f"/drives/{drive}/items/{folder['id']}/children")
+        folders = [child for child in children if "folder" in child]
+        contents = await self._each(
+            folders, lambda child: self.client.graph_pages(f"/drives/{drive}/items/{child['id']}/children")
+        )
+        nested = {child["id"]: files for child, files in zip(folders, contents, strict=True)}
+        return [
+            CourseItem(
+                id=child["id"],
+                kind=ItemKind.FOLDER if "folder" in child else ItemKind.FILE,
+                title=child["name"],
+                url=child.get("webUrl"),
+                attachments=tuple(
+                    _drive_attachment(file) for file in nested.get(child["id"], [child]) if "file" in file
+                ),
+                modified_at=parse_time(child.get("lastModifiedDateTime")),
+            )
+            for child in sorted(
+                children, key=lambda child: child.get("lastModifiedDateTime") or "", reverse=True
+            )
         ]
 
     async def _teams(self) -> list[dict[str, Any]]:
@@ -195,5 +236,14 @@ def _points(outcomes: list[dict[str, Any]], grading: dict[str, Any] | None) -> s
         points = (outcome.get("points") or outcome.get("publishedPoints") or {}).get("points")
         if points is not None:
             maximum = (grading or {}).get("maxPoints")
-            return f"{points:g} / {maximum:g}" if maximum is not None else f"{points:g}"
+            return f"{round(points, 2):g} / {maximum:g}" if maximum is not None else f"{round(points, 2):g}"
     return None
+
+
+def _drive_attachment(file: dict[str, Any]) -> Attachment:
+    return Attachment(
+        name=file["name"],
+        url=file["webUrl"],
+        mime_type=(file.get("file") or {}).get("mimeType"),
+        size=file.get("size"),
+    )

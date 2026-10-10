@@ -161,3 +161,7 @@ export function linkSegments(html: string): LinkSegment[] {
   }
   return result;
 }
+
+export function formatScore(value: string) {
+  return value.replace(/\d+[.,]\d+/g, (number) => String(Number(Number(number.replace(',', '.')).toFixed(2))));
+}

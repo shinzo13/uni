@@ -60,7 +60,15 @@ export default function SourcesScreen() {
       <Text style={[text.title, styles.heading]}>Appearance</Text>
       <CourseListLayoutOptions />
       <CourseLayoutOptions />
-      <Pressable onPress={signOut} style={styles.signOut}>
+      <Pressable
+        onPress={() =>
+          Alert.alert('Sign out?', 'Your sources stay connected to your account.', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Sign out', style: 'destructive', onPress: signOut },
+          ])
+        }
+        style={styles.signOut}
+      >
         <Text style={[styles.action, { color: colors.danger }]}>Sign out</Text>
       </Pressable>
     </ScrollView>

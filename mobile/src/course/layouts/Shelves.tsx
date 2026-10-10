@@ -6,7 +6,7 @@ import { FlatList, LayoutAnimation, Pressable, RefreshControl, ScrollView, Style
 import type { Assignment, Post } from '@/api/types';
 import { EmptyState } from '@/components/EmptyState';
 import { PostCard } from '@/components/PostCard';
-import { type CourseData, type CourseLayoutProps, type PlacedItem, useOpeners } from '@/course/data';
+import { beforeCurrentTerm, type CourseData, type CourseLayoutProps, type PlacedItem, useOpeners } from '@/course/data';
 import { ItemRow } from '@/course/ItemRow';
 import { isNewSince, itemCaption, itemColor, itemGlyph, KIND_LABELS, type Shelf, shelfOf } from '@/course/items';
 import { formatDay, formatShortDate, formatTime, plainText, relativeDue } from '@/format';
@@ -61,11 +61,9 @@ function taskStatus(assignment: Assignment | null, now: number): Status | null {
   if (!assignment.due_at) return { text: 'No deadline', color: colors.muted, done: false };
   const left = new Date(assignment.due_at).getTime() - now;
   if (left < 0)
-    return {
-      text: `Overdue · ${formatShortDate(assignment.due_at)}`,
-      color: colors.danger,
-      done: false,
-    };
+    return beforeCurrentTerm(assignment.due_at)
+      ? { text: `Missed · ${formatShortDate(assignment.due_at)}`, color: colors.muted, done: false }
+      : { text: `Overdue · ${formatShortDate(assignment.due_at)}`, color: colors.danger, done: false };
   const due = `Due ${relativeDue(assignment.due_at, new Date(now))}`;
   return {
     text: due,
@@ -160,7 +158,9 @@ export function ShelvesLayout({ data }: CourseLayoutProps) {
   };
 
   const detailOf = (placed: PlacedItem) =>
-    data.moodle.length > 1 ? (data.moodle.find((course) => course.courseId === placed.courseId)?.detail ?? null) : null;
+    data.materials.length > 1
+      ? (data.materials.find((course) => course.courseId === placed.courseId)?.detail ?? null)
+      : null;
   const isNew = (placed: PlacedItem) => isNewSince(placed.item, data.lastSeen);
   const isNewPost = (post: Post) => !!data.lastSeen && post.posted_at > data.lastSeen;
   const openTask = (task: Task) => {
@@ -192,7 +192,7 @@ export function ShelvesLayout({ data }: CourseLayoutProps) {
     );
   }
 
-  const teamsOnly = data.moodle.length === 0;
+  const teamsOnly = data.materials.length === 0;
   const materials = shelves.info.length + shelves.lectures.length + shelves.files.length + shelves.links.length;
   const empty = materials + shelves.tasks.length + shelves.forums.length + data.posts.length === 0;
   const next = [...data.upcoming].sort((a, b) => a.starts_at.localeCompare(b.starts_at))[0] ?? null;

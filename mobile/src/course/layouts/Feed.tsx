@@ -10,7 +10,7 @@ import { Loading } from '@/components/Loading';
 import { type CourseData, type CourseLayoutProps, type PlacedItem, termRange, useOpeners } from '@/course/data';
 import { ItemRow } from '@/course/ItemRow';
 import { isNewSince, isVisibleItem, itemCaption, itemColor, itemFileKind, itemGlyph } from '@/course/items';
-import { formatShortDate, formatTime, isoDate, plainText, relativeDue, startOfWeek } from '@/format';
+import { currentTerm, formatShortDate, formatTime, isoDate, plainText, relativeDue, startOfWeek } from '@/format';
 import { colors, radii, sourceNames, spacing, tinted, type } from '@/theme';
 import { useNow } from '@/useNow';
 
@@ -81,7 +81,7 @@ export function FeedLayout({ data }: CourseLayoutProps) {
   const now = useNow();
   const feed = useFeed(data, openers, now);
   const shelves = useShelves(data);
-  const hasMoodle = data.moodle.length > 0;
+  const hasMoodle = data.materials.length > 0;
 
   if (data.isLoading && feed.sections.length === 0) {
     return <Loading />;
@@ -124,7 +124,7 @@ export function FeedLayout({ data }: CourseLayoutProps) {
 }
 
 function useFeed(data: CourseData, openers: Openers, now: number) {
-  const { items, posts, assignments, moodle, lastSeen } = data;
+  const { items, posts, assignments, materials: moodle, lastSeen } = data;
   const { findAssignment } = openers;
   return useMemo(() => {
     const events: FeedEvent[] = [];
@@ -218,7 +218,7 @@ function useFeed(data: CourseData, openers: Openers, now: number) {
     }
     const seen = lastSeen ? Date.parse(lastSeen) : null;
     const weekStart = startOfWeek(new Date(now)).getTime();
-    const termStart = new Date(`${termRange(new Date(now)).start}T00:00:00`).getTime();
+    const termStart = new Date(`${termRange(currentTerm(new Date(now)).code).start}T00:00:00`).getTime();
     for (const event of events) {
       const bucket = bucketOf(event.at, seen, weekStart, termStart);
       const last = sections[sections.length - 1];
@@ -262,7 +262,7 @@ function bucketOf(at: number, seen: number | null, weekStart: number, termStart:
 }
 
 function useShelves(data: CourseData) {
-  const { moodle } = data;
+  const { materials: moodle } = data;
   return useMemo(() => {
     const sections: ShelfSection[] = moodle.flatMap((course) =>
       course.sections
@@ -270,7 +270,9 @@ function useShelves(data: CourseData) {
           key: `${course.courseId}:${section.id}`,
           title: section.title,
           caption: moodle.length > 1 ? (course.detail ?? course.title) : null,
-          data: section.items.filter(isVisibleItem).map((item) => ({ item, section, courseId: course.courseId })),
+          data: section.items
+            .filter(isVisibleItem)
+            .map((item) => ({ item, section, courseId: course.courseId, source: course.source })),
         }))
         .filter((section) => section.data.length > 0),
     );
@@ -595,8 +597,8 @@ function AssignmentEvent({
             <MaterialCommunityIcons name="clock-outline" size={14} color={accent} />
             <Text style={[styles.chipLabel, { color: accent }]}>
               {due > now
-                ? `due ${relativeDue(assignment.due_at!, new Date(now))}`
-                : `was due ${formatShortDate(new Date(due))}`}
+                ? `due ${relativeDue(assignment.due_at!, new Date(now))} · ${formatTime(assignment.due_at!)}`
+                : `was due ${formatShortDate(new Date(due))} ${formatTime(assignment.due_at!)}`}
             </Text>
           </View>
         ) : null}
@@ -606,7 +608,6 @@ function AssignmentEvent({
             <Text style={[styles.chipLabel, { color: done ? colors.success : colors.muted }]}>{status}</Text>
           </View>
         ) : null}
-        {due !== null && !pinned ? <Text style={type.caption}>{formatTime(assignment.due_at!)}</Text> : null}
       </View>
     </Pressable>
   );

@@ -6,7 +6,7 @@ import { Alert, Animated, Pressable, RefreshControl, ScrollView, StyleSheet, Tex
 import { useCompletion } from '@/api/queries';
 import type { Assignment, ClassSession } from '@/api/types';
 import { PostCard } from '@/components/PostCard';
-import { type CourseLayoutProps, type PlacedItem, useOpeners } from '@/course/data';
+import { beforeCurrentTerm, type CourseLayoutProps, type PlacedItem, useOpeners } from '@/course/data';
 import { itemCaption, itemColor, itemGlyph, KIND_LABELS } from '@/course/items';
 import { formatDay, formatShortDate, formatTime, relativeDue } from '@/format';
 import { readItem, writeItem } from '@/session/storage';
@@ -108,7 +108,11 @@ export function ChecklistLayout({ data }: CourseLayoutProps) {
   const assignmentLine = useCallback(
     (assignment: Assignment): Line => {
       const finished = isFinished(assignment);
-      const overdue = !finished && !!assignment.due_at && new Date(assignment.due_at).getTime() < now;
+      const overdue =
+        !finished &&
+        !!assignment.due_at &&
+        new Date(assignment.due_at).getTime() < now &&
+        !beforeCurrentTerm(assignment.due_at);
       const caption = finished
         ? assignment.grade
           ? `Graded ${assignment.grade}`
@@ -141,7 +145,11 @@ export function ChecklistLayout({ data }: CourseLayoutProps) {
       const localId = `${courseId}:${item.id}`;
       const task = item.kind === 'assignment' || item.kind === 'quiz';
       const due = task && !finished ? dueCaption(assignment?.due_at ?? null) : null;
-      const overdue = !!due && !!assignment?.due_at && new Date(assignment.due_at).getTime() < now;
+      const overdue =
+        !!due &&
+        !!assignment?.due_at &&
+        new Date(assignment.due_at).getTime() < now &&
+        !beforeCurrentTerm(assignment.due_at);
       const base = {
         key: localId,
         title: item.title,
@@ -207,13 +215,13 @@ export function ChecklistLayout({ data }: CourseLayoutProps) {
   const model = useMemo(() => {
     const matched = new Set<string>();
     const groups: Group[] = [];
-    const multiple = data.moodle.length > 1;
-    data.moodle.forEach((course) => {
+    const multiple = data.materials.length > 1;
+    data.materials.forEach((course) => {
       course.sections.forEach((section, index) => {
         const lines = section.items
           .filter((item) => item.kind !== 'label')
           .map((item) => {
-            const placed = { item, section, courseId: course.courseId };
+            const placed = { item, section, courseId: course.courseId, source: course.source };
             const assignment = item.kind === 'assignment' || item.kind === 'quiz' ? findAssignment(placed) : null;
             if (assignment) matched.add(`${assignment.source}:${assignment.id}`);
             return itemLine(placed);
@@ -232,7 +240,7 @@ export function ChecklistLayout({ data }: CourseLayoutProps) {
       .filter((assignment) => !matched.has(`${assignment.source}:${assignment.id}`))
       .sort((a, b) => (a.due_at ?? '9999').localeCompare(b.due_at ?? '9999'))
       .map(assignmentLine);
-    if (data.moodle.length === 0) {
+    if (data.materials.length === 0) {
       const open = extra.filter((line) => !isDone(line));
       const done = extra.filter(isDone);
       if (open.length > 0)
@@ -271,7 +279,7 @@ export function ChecklistLayout({ data }: CourseLayoutProps) {
       hasLocal: all.some((line) => line.mark === 'local' || (line.mark === 'done' && !!line.onToggle)),
       moodleTracked,
     };
-  }, [data.moodle, data.assignments, data.items, findAssignment, itemLine, assignmentLine]);
+  }, [data.materials, data.assignments, data.items, findAssignment, itemLine, assignmentLine]);
 
   const nextDeadline = useMemo(
     () =>
@@ -284,9 +292,9 @@ export function ChecklistLayout({ data }: CourseLayoutProps) {
   );
 
   const activeFilter: Filter = filter ?? (model.trackable.length > model.done ? 'todo' : 'all');
-  const teamsOnly = data.moodle.length === 0;
+  const teamsOnly = data.materials.length === 0;
 
-  if (data.isLoading && data.items.length === 0 && data.moodle.length > 0) {
+  if (data.isLoading && data.items.length === 0 && data.materials.length > 0) {
     return <Skeleton />;
   }
 

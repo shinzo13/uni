@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import type { SourceKind } from '@/api/types';
 import { ChecklistLayout } from '@/course/layouts/Checklist';
@@ -15,6 +15,8 @@ import { LayoutSheet } from '@/design/LayoutPicker';
 import { SubjectIcon } from '@/components/SubjectIcon';
 import { editSubject, useSubjectResolver } from '@/subjects';
 import { colors, spacing, type } from '@/theme';
+
+const HEADER_ACTIONS_WIDTH = 170;
 
 const LAYOUTS = {
   dashboard: DashboardLayout,
@@ -33,6 +35,7 @@ export default function CourseScreen() {
   const Layout = LAYOUTS[courseLayout];
   const { markSeen } = data;
   const [picking, setPicking] = useState(false);
+  const { width } = useWindowDimensions();
 
   useEffect(() => markSeen, [markSeen]);
 
@@ -42,7 +45,7 @@ export default function CourseScreen() {
         options={{
           title: look.name,
           headerTitle: () => (
-            <View style={styles.headerTitle}>
+            <View style={[styles.headerTitle, { maxWidth: width - HEADER_ACTIONS_WIDTH }]}>
               <SubjectIcon icon={look.glyph} color={look.tint} size={28} />
               <Text style={type.title} numberOfLines={1}>
                 {look.name}

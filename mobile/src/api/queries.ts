@@ -7,6 +7,7 @@ import type {
   Assignment,
   ClassSession,
   Course,
+  CourseRef,
   CourseSection,
   Exam,
   Grade,
@@ -18,9 +19,15 @@ import type {
   Subject,
   SubjectDraft,
 } from '@/api/types';
+import { formatScore } from '@/format';
 import { useSession } from '@/session/SessionProvider';
 
-function usePage<T>(key: unknown[], path: string, params: Record<string, string> = {}) {
+function usePage<T>(
+  key: unknown[],
+  path: string,
+  params: Record<string, string> = {},
+  select?: (page: Page<T>) => Page<T>,
+) {
   const { token } = useSession();
   const queryClient = useQueryClient();
   const queryKey = [...key, params];
@@ -28,6 +35,7 @@ function usePage<T>(key: unknown[], path: string, params: Record<string, string>
     queryKey,
     queryFn: () => request<Page<T>>(path, { token, params }),
     enabled: !!token,
+    select,
   });
   const [refreshing, setRefreshing] = useState(false);
   const refresh = async () => {
@@ -53,8 +61,26 @@ export function useAcademicEvents(start: string, end: string) {
   return usePage<AcademicEvent>(['events'], '/schedule/events', { start, end });
 }
 
+function readableAssignments(page: Page<Assignment>) {
+  return {
+    ...page,
+    items: page.items.map((item) => (item.grade ? { ...item, grade: formatScore(item.grade) } : item)),
+  };
+}
+
+function readableGrades(page: Page<Grade>) {
+  return {
+    ...page,
+    items: page.items.map((grade) => ({
+      ...grade,
+      value: formatScore(grade.value),
+      max_value: grade.max_value && formatScore(grade.max_value),
+    })),
+  };
+}
+
 export function useAssignments() {
-  return usePage<Assignment>(['assignments'], '/assignments');
+  return usePage<Assignment>(['assignments'], '/assignments', {}, readableAssignments);
 }
 
 export function useCourses() {
@@ -73,7 +99,7 @@ export function usePosts() {
 }
 
 export function useGrades() {
-  return usePage<Grade>(['grades'], '/grades');
+  return usePage<Grade>(['grades'], '/grades', {}, readableGrades);
 }
 
 export function useSources() {
@@ -144,18 +170,18 @@ function combineSections(results: { data?: Page<CourseSection>; isLoading: boole
   };
 }
 
-function sectionsPath(courseId: string) {
-  return `/courses/moodle/${encodeURIComponent(courseId)}/sections`;
+function sectionsPath(ref: CourseRef) {
+  return `/courses/${ref.source}/${encodeURIComponent(ref.course_id)}/sections`;
 }
 
-export function useMoodleSections(courseIds: string[]) {
+export function useMaterialSections(refs: CourseRef[]) {
   const { token } = useSession();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const { pages, isLoading } = useQueries({
-    queries: courseIds.map((courseId) => ({
-      queryKey: ['sections', 'moodle', courseId, {}],
-      queryFn: () => request<Page<CourseSection>>(sectionsPath(courseId), { token }),
+    queries: refs.map((ref) => ({
+      queryKey: ['sections', ref.source, ref.course_id, {}],
+      queryFn: () => request<Page<CourseSection>>(sectionsPath(ref), { token }),
       enabled: !!token,
     })),
     combine: combineSections,
@@ -164,10 +190,10 @@ export function useMoodleSections(courseIds: string[]) {
     setRefreshing(true);
     try {
       await Promise.all(
-        courseIds.map(async (courseId) =>
+        refs.map(async (ref) =>
           queryClient.setQueryData(
-            ['sections', 'moodle', courseId, {}],
-            await request<Page<CourseSection>>(sectionsPath(courseId), { token, params: { refresh: true } }),
+            ['sections', ref.source, ref.course_id, {}],
+            await request<Page<CourseSection>>(sectionsPath(ref), { token, params: { refresh: true } }),
           ),
         ),
       );

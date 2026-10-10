@@ -10,7 +10,7 @@ import { Row, SectionHeader } from '@/components/Row';
 import { Segmented } from '@/components/Segmented';
 import { SourceIssues } from '@/components/SourceIssues';
 import { SubjectIcon } from '@/components/SubjectIcon';
-import { formatDateTime, relativeDue } from '@/format';
+import { currentTerm, formatDateTime, relativeDue, termOf } from '@/format';
 import { type Resolve, useSubjectResolver } from '@/subjects';
 import { colors, sourceNames, text } from '@/theme';
 
@@ -106,6 +106,9 @@ function isCurrent(assignment: Assignment, now: Date) {
   }
   if (assignment.due_at) {
     return new Date(assignment.due_at) >= now;
+  }
+  if (termOf(assignment.course_name) === currentTerm(now).code) {
+    return true;
   }
   const opened = assignment.opens_at ? new Date(assignment.opens_at) : null;
   return !!opened && now.getTime() - opened.getTime() < RECENT_WITHOUT_DEADLINE_DAYS * 86_400_000;

@@ -32,7 +32,8 @@ export default function AssignmentScreen() {
     ['Submitted', assignment.submitted_at ? formatDateTime(assignment.submitted_at) : null],
     ['Grade', assignment.grade],
   ].filter((fact): fact is [string, string] => !!fact[1]);
-  const description = plainText(assignment.description_html);
+  const body = plainText(assignment.description_html);
+  const description = body.trim().toLowerCase() === assignment.title.trim().toLowerCase() ? '' : body;
 
   return (
     <ScrollView contentContainerStyle={styles.container}>

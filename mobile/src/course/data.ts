@@ -3,7 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useMemo } from 'react';
 
 import { request } from '@/api/client';
-import { useAssignments, useClasses, useGrades, useMoodleSections, usePosts } from '@/api/queries';
+import { useAssignments, useClasses, useGrades, useMaterialSections, usePosts } from '@/api/queries';
 import type {
   Assignment,
   Attachment,
@@ -15,14 +15,16 @@ import type {
   SourceKind,
 } from '@/api/types';
 import { useDesign } from '@/design/DesignProvider';
-import { addDays, courseDetail, currentTerm, isoDate } from '@/format';
+import { addDays, courseDetail, currentTerm, isoDate, termOf } from '@/format';
 import { useSession } from '@/session/SessionProvider';
 import { useNow } from '@/useNow';
 import { refKey, type SubjectLook, useCourseIndex } from '@/subjects';
 
 export const UPCOMING_DAYS = 14;
+const MATERIAL_SOURCES = new Set<SourceKind>(['moodle', 'teams']);
 
-export type MoodleCourse = {
+export type MaterialCourse = {
+  source: SourceKind;
   courseId: string;
   title: string;
   detail: string | null;
@@ -33,11 +35,12 @@ export type PlacedItem = {
   item: CourseItem;
   section: CourseSection;
   courseId: string;
+  source: SourceKind;
 };
 
 export type CourseData = {
   look: SubjectLook;
-  moodle: MoodleCourse[];
+  materials: MaterialCourse[];
   items: PlacedItem[];
   posts: Post[];
   assignments: Assignment[];
@@ -52,16 +55,26 @@ export type CourseData = {
 
 export type CourseLayoutProps = { data: CourseData };
 
-export function termRange(now = new Date()) {
-  const term = currentTerm(now);
-  const year = Number(term.code.slice(0, 4));
-  return term.code.endsWith('SZ')
+export function termRange(code = currentTerm().code) {
+  const year = Number(code.slice(0, 4));
+  return code.endsWith('SZ')
     ? { start: `${year}-10-01`, end: `${year + 1}-02-28` }
     : { start: `${year}-02-15`, end: `${year}-06-30` };
 }
 
-export function useTermClasses() {
-  const { start, end } = termRange();
+export function beforeCurrentTerm(iso: string) {
+  return Date.parse(iso) < Date.parse(`${termRange().start}T00:00:00`);
+}
+
+export function useTermClasses(look: SubjectLook) {
+  const index = useCourseIndex();
+  const current = currentTerm().code;
+  const terms = look.courses
+    .map((ref) => index.get(refKey(ref.source, ref.course_id)))
+    .map((course) => (course ? (course.term ?? termOf(course.name)) : null))
+    .filter((term): term is string => !!term && term <= current)
+    .sort();
+  const { start, end } = termRange(terms.includes(current) ? current : (terms.pop() ?? current));
   return useClasses(start, end);
 }
 
@@ -73,11 +86,11 @@ export function useUpcomingClasses() {
 export function useCourseData(look: SubjectLook): CourseData {
   const index = useCourseIndex();
   const design = useDesign();
-  const moodleIds = useMemo(
-    () => look.courses.filter((course) => course.source === 'moodle').map((course) => course.course_id),
+  const materialRefs = useMemo(
+    () => look.courses.filter((course) => MATERIAL_SOURCES.has(course.source)),
     [look.courses],
   );
-  const sections = useMoodleSections(moodleIds);
+  const sections = useMaterialSections(materialRefs);
   const posts = usePosts();
   const assignments = useAssignments();
   const grades = useGrades();
@@ -91,27 +104,31 @@ export function useCourseData(look: SubjectLook): CourseData {
     [members],
   );
 
-  const moodle = useMemo(
+  const materials = useMemo(
     () =>
-      moodleIds.map((courseId, position) => {
-        const name = index.get(refKey('moodle', courseId))?.name ?? courseId;
-        return {
-          courseId,
-          title: name,
-          detail: courseDetail(name),
-          sections: withoutDuplicateForums(sections.pages[position]?.items ?? []),
-        };
-      }),
-    [moodleIds, sections.pages, index],
+      materialRefs
+        .map((ref, position) => {
+          const name = index.get(refKey(ref.source, ref.course_id))?.name ?? ref.course_id;
+          return {
+            source: ref.source,
+            courseId: ref.course_id,
+            title: name,
+            detail: courseDetail(name),
+            sections: withoutDuplicateForums(sections.pages[position]?.items ?? []),
+          };
+        })
+        .filter((course) => course.source === 'moodle' || course.sections.length > 0)
+        .sort((a, b) => Number(a.source !== 'moodle') - Number(b.source !== 'moodle')),
+    [materialRefs, sections.pages, index],
   );
   const items = useMemo(
     () =>
-      moodle.flatMap((course) =>
+      materials.flatMap((course) =>
         course.sections.flatMap((section) =>
-          section.items.map((item) => ({ item, section, courseId: course.courseId })),
+          section.items.map((item) => ({ item, section, courseId: course.courseId, source: course.source })),
         ),
       ),
-    [moodle],
+    [materials],
   );
   const now = useNow();
   const filtered = useMemo(
@@ -147,7 +164,7 @@ export function useCourseData(look: SubjectLook): CourseData {
 
   return {
     look,
-    moodle,
+    materials,
     items,
     ...filtered,
     upcoming,
@@ -166,7 +183,7 @@ export function useOpeners(assignments: Assignment[]) {
       const link = await request<{ url: string }>('/files/link', {
         method: 'POST',
         token,
-        body: { kind: 'moodle', url: attachment.url },
+        body: { kind: attachmentSource(attachment), url: attachment.url },
       });
       await WebBrowser.openBrowserAsync(link.url);
     },
@@ -174,7 +191,7 @@ export function useOpeners(assignments: Assignment[]) {
   );
   const openItem = useCallback(
     (placed: PlacedItem) => {
-      const { item, courseId } = placed;
+      const { item, courseId, source } = placed;
       if (item.kind === 'page') {
         router.push({
           pathname: '/page/[kind]/[course]/[item]',
@@ -187,7 +204,10 @@ export function useOpeners(assignments: Assignment[]) {
         return;
       }
       if (item.kind === 'folder' || item.attachments.length > 1) {
-        router.push({ pathname: '/folder/[course]/[item]', params: { course: courseId, item: item.id } });
+        router.push({
+          pathname: '/folder/[kind]/[course]/[item]',
+          params: { kind: source, course: courseId, item: item.id },
+        });
         return;
       }
       if (item.kind === 'assignment' || item.kind === 'quiz') {
@@ -217,6 +237,10 @@ export function useOpeners(assignments: Assignment[]) {
     [assignments],
   );
   return { openItem, openAttachment, findAssignment };
+}
+
+export function attachmentSource(attachment: Attachment): SourceKind {
+  return /^https:\/\/[^/]+\.sharepoint\.com\//.test(attachment.url) ? 'teams' : 'moodle';
 }
 
 function withoutDuplicateForums(sections: CourseSection[]) {

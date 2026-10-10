@@ -6,7 +6,13 @@ import { Animated, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, 
 import type { Assignment, ClassSession, CourseRef } from '@/api/types';
 import { EmptyState } from '@/components/EmptyState';
 import { PostCard } from '@/components/PostCard';
-import { type CourseLayoutProps, type MoodleCourse, type PlacedItem, useOpeners, useTermClasses } from '@/course/data';
+import {
+  type CourseLayoutProps,
+  type MaterialCourse,
+  type PlacedItem,
+  useOpeners,
+  useTermClasses,
+} from '@/course/data';
 import { ItemRow } from '@/course/ItemRow';
 import { isNewSince, isVisibleItem } from '@/course/items';
 import { formatDay, formatShortDate, formatTime, isoDate, relativeDue, startOfWeek } from '@/format';
@@ -159,7 +165,7 @@ function targetsFor(parsed: Parsed, fallbackKind: string | null, meetings: Meeti
   return meeting ? [meeting] : [];
 }
 
-function dominantKind(course: MoodleCourse) {
+function dominantKind(course: MaterialCourse) {
   const counts = new Map<string, number>();
   course.sections.forEach((section) => {
     const kind = kindOf(section.title);
@@ -169,7 +175,7 @@ function dominantKind(course: MoodleCourse) {
   return ranked.length === 1 || (ranked.length > 1 && ranked[0][1] > ranked[1][1]) ? ranked[0][0] : null;
 }
 
-function matchSections(moodle: MoodleCourse[], meetings: Meeting[]): Matching {
+function matchSections(moodle: MaterialCourse[], meetings: Meeting[]): Matching {
   const codes = [...new Set(meetings.map((meeting) => meeting.code))];
   const byMeeting = new Map<string, Group[]>();
   const general: Group[] = [];
@@ -184,7 +190,9 @@ function matchSections(moodle: MoodleCourse[], meetings: Meeting[]): Matching {
   moodle.forEach((course) => {
     const courseKind = kindOf(course.detail) ?? dominantKind(course);
     course.sections.forEach((section) => {
-      const placed = section.items.filter(isVisibleItem).map((item) => ({ item, section, courseId: course.courseId }));
+      const placed = section.items
+        .filter(isVisibleItem)
+        .map((item) => ({ item, section, courseId: course.courseId, source: course.source }));
       if (placed.length === 0) return;
       const key = `${course.courseId}:${section.id}`;
       const sectionKind = kindOf(section.title);
@@ -250,7 +258,7 @@ function openAssignment(assignment: Assignment) {
 export function SessionsLayout({ data }: CourseLayoutProps) {
   const { look } = data;
   const tint = look.tint;
-  const term = useTermClasses();
+  const term = useTermClasses(data.look);
   const now = useNow();
   const openers = useOpeners(data.assignments);
   const [mode, setMode] = useState<'focus' | 'all'>('focus');
@@ -259,7 +267,7 @@ export function SessionsLayout({ data }: CourseLayoutProps) {
   const [allPosts, setAllPosts] = useState(false);
 
   const meetings = useMemo(() => buildMeetings(term.data?.items ?? [], look.courses), [term.data, look.courses]);
-  const matching = useMemo(() => matchSections(data.moodle, meetings), [data.moodle, meetings]);
+  const matching = useMemo(() => matchSections(data.materials, meetings), [data.materials, meetings]);
   const nextIndex = useMemo(() => {
     const index = meetings.findIndex((meeting) => new Date(meeting.session.ends_at).getTime() > now);
     return index === -1 ? meetings.length - 1 : index;
@@ -307,7 +315,7 @@ export function SessionsLayout({ data }: CourseLayoutProps) {
       .sort((a, b) => (a.due_at ?? '9999').localeCompare(b.due_at ?? '9999'));
   }, [data.assignments, dueWindow, mode, now]);
 
-  const hasMoodle = data.moodle.length > 0;
+  const hasMoodle = data.materials.length > 0;
   const hasSections = matching.general.length > 0 || matching.matched > 0;
   const unmatched = meetings.length > 0 && hasMoodle && !data.isLoading && matching.matched === 0 && hasSections;
   const plainSections = meetings.length === 0 || matching.matched === 0;
