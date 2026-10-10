@@ -49,6 +49,11 @@ class SourceStateOut(BaseModel):
     error: str | None
 
 
+class ItemHtml(BaseModel):
+    title: str
+    html: str
+
+
 class CompletionIn(BaseModel):
     completed: bool
 

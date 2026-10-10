@@ -1,16 +1,18 @@
 import base64
+import re
 import uuid
+from html import unescape
 from urllib.parse import urlparse
 
 from cryptography.fernet import InvalidToken
 from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import Response
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from uni.api.deps import CurrentUser, Db, Registry
 from uni.domain import SourceKind
-from uni.models import SourceLink
+from uni.models import SourceLink, User
 from uni.registry import SourceRegistry
 from uni.sources.teams.client import GRAPH_URL, TeamsClient
 
@@ -19,6 +21,11 @@ router = APIRouter(prefix="/files", tags=["files"])
 PASSED_HEADERS = ("content-type", "content-disposition", "content-length")
 SHAREPOINT_SUFFIX = ".sharepoint.com"
 LINK_LIFETIME_SECONDS = 300
+UNAVAILABLE_PAGE = (
+    '<!doctype html><meta name="viewport" content="width=device-width">'
+    '<body style="font-family:sans-serif;padding:24px">'
+    "<h2>File unavailable</h2><p>It was removed or you no longer have access to it in the source.</p>"
+)
 
 
 class FileRequest(BaseModel):
@@ -33,8 +40,23 @@ class FileLink(BaseModel):
 @router.post("/link")
 async def link(body: FileRequest, user: CurrentUser, registry: Registry) -> FileLink:
     check_url(registry, body.kind, body.url)
-    sealed = registry.seal({"user_id": str(user.id), "kind": body.kind, "url": body.url})
-    return FileLink(url=f"{registry.settings.public_url}/files/{sealed}")
+    return FileLink(url=signed_url(registry, user, body.kind, body.url))
+
+
+def signed_url(registry: SourceRegistry, user: User, kind: SourceKind, url: str) -> str:
+    sealed = registry.seal({"user_id": str(user.id), "kind": kind, "url": url})
+    return f"{registry.settings.public_url}/files/{sealed}"
+
+
+def sign_moodle_files(registry: SourceRegistry, user: User, html: str) -> str:
+    base = re.escape(registry.settings.moodle_base_url.rstrip("/"))
+    pattern = re.compile(rf'(?P<attr>src|href)="(?P<url>{base}/[^"]*pluginfile\.php[^"]*)"')
+    return pattern.sub(
+        lambda match: (
+            f'{match["attr"]}="{signed_url(registry, user, SourceKind.MOODLE, unescape(match["url"]))}"'
+        ),
+        html,
+    )
 
 
 @router.get("/{sealed}")
@@ -60,7 +82,7 @@ async def download(sealed: str, db: Db, registry: Registry) -> Response:
         client = TeamsClient(credentials["refresh_token"], http=registry.http)
         upstream = await client.download(f"{GRAPH_URL}/shares/{share}/driveItem/content")
     if upstream.status_code >= 400:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "file is unavailable")
+        return HTMLResponse(UNAVAILABLE_PAGE, status.HTTP_404_NOT_FOUND)
     headers = {name: upstream.headers[name] for name in PASSED_HEADERS if name in upstream.headers}
     return Response(upstream.content, headers=headers)
 

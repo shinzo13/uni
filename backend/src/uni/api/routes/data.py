@@ -2,8 +2,9 @@ from datetime import date
 
 from fastapi import APIRouter, HTTPException, status
 
-from uni.api.deps import AggregatorDep, ProgressDep
-from uni.api.schemas import CompletionIn, Page
+from uni.api.deps import AggregatorDep, CurrentUser, ProgressDep, Registry
+from uni.api.routes.files import sign_moodle_files
+from uni.api.schemas import CompletionIn, ItemHtml, Page
 from uni.domain import (
     AcademicEvent,
     Assignment,
@@ -96,6 +97,23 @@ async def sections(
         only=kind,
     )
     return Page.of(collected)
+
+
+@router.get("/courses/moodle/{course_id}/items/{item_id}/html")
+async def item_html(
+    course_id: str, item_id: str, aggregator: AggregatorDep, user: CurrentUser, registry: Registry
+) -> ItemHtml:
+    collected = await aggregator.collect(
+        f"sections:{course_id}",
+        MaterialSource,
+        lambda source: source.sections(course_id),
+        CourseSection,
+        only=SourceKind.MOODLE,
+    )
+    item = next((item for section in collected.items for item in section.items if item.id == item_id), None)
+    if item is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "item not found")
+    return ItemHtml(title=item.title, html=sign_moodle_files(registry, user, item.html))
 
 
 @router.post("/courses/moodle/{course_id}/items/{item_id}/completion", status_code=status.HTTP_204_NO_CONTENT)

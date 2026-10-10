@@ -139,3 +139,32 @@ async def test_completion_is_sent_to_moodle_and_patched_into_the_snapshot(signed
     assert response.status_code == 204
     assert linked["moodle"].changes == [("7", True)]
     assert sections[0]["items"][0]["completion"] == "complete"
+
+
+class FakeMoodlePage:
+    kind = SourceKind.MOODLE
+
+    async def sections(self, course_id: str) -> list[CourseSection]:
+        html = (
+            '<p><img src="https://moodle.test/sci/webservice/pluginfile.php/1/mod_page/content/2/a.png">'
+            '<a href="https://example.com/x">x</a></p>'
+        )
+        return [
+            CourseSection(
+                id="s",
+                title="Week",
+                items=(CourseItem(id="9", kind=ItemKind.PAGE, title="Intro", html=html),),
+            )
+        ]
+
+
+async def test_page_html_gets_signed_moodle_file_links(signed_in, linked):
+    linked["moodle"] = FakeMoodlePage()
+
+    response = await signed_in.get("/courses/moodle/10/items/9/html")
+    missing = await signed_in.get("/courses/moodle/10/items/404/html")
+
+    html = response.json()["html"]
+    assert 'src="https://uni.test/files/' in html
+    assert 'href="https://example.com/x"' in html
+    assert missing.status_code == 404

@@ -2,8 +2,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { WebView, type WebViewNavigation } from 'react-native-webview';
 
-import { useSections } from '@/api/queries';
-import type { SourceKind } from '@/api/types';
+import { useItemHtml } from '@/api/queries';
 import { EmptyState } from '@/components/EmptyState';
 import { Loading } from '@/components/Loading';
 import { colors } from '@/theme';
@@ -18,11 +17,10 @@ const PAGE_STYLE = `
 `;
 
 export default function PageScreen() {
-  const { kind, course, item } = useLocalSearchParams<{ kind: SourceKind; course: string; item: string }>();
-  const sections = useSections(kind, course);
-  const page = sections.data?.items.flatMap((section) => section.items).find((entry) => entry.id === item);
+  const { course, item } = useLocalSearchParams<{ kind: string; course: string; item: string }>();
+  const { data: page, isLoading } = useItemHtml(course, item);
 
-  if (sections.isLoading) {
+  if (isLoading) {
     return <Loading />;
   }
   if (!page) {

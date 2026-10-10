@@ -203,3 +203,18 @@ export function useCompletion() {
     },
   });
 }
+
+export function useItemHtml(courseId: string, itemId: string) {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ['item-html', courseId, itemId],
+    queryFn: () =>
+      request<{ title: string; html: string }>(
+        `/courses/moodle/${encodeURIComponent(courseId)}/items/${encodeURIComponent(itemId)}/html`,
+        { token },
+      ),
+    enabled: !!token,
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
